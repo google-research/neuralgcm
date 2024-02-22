@@ -1,0 +1,8 @@
+*.egg-info
+.DS_Store
+build
+dist
+docs/.ipynb_checkpoints
+docs/_build
+docs/_autosummary
+__pycache__

@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["neuralgcm"]
+
+[project]
+name = "neuralgcm"
+version = "0.1.0"
+authors = [
+    {name = "Google LLC", email = "noreply@google.com"},
+]
+readme = "README.md"
+license = {file = "LICENSE"}
+requires-python = ">=3.10"
+dependencies = [
+    "dinosaur@git+https://github.com/google-research/dinosaur",
+    "dm-haiku",
+    "gin-config",
+    "jax",
+    "jaxlib",
+    "numpy",
+    "optax",
+    "pandas",
+    "tensorflow_probability",
+    "xarray",
+]
+
+[project.optional-dependencies]
+tests = [
+    "absl-py",
+    "chex",
+    "pytest",
+]
