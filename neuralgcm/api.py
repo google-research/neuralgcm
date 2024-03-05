@@ -146,6 +146,12 @@ class PressureLevelModel:
       self, dataset: xarray.Dataset
   ) -> tuple[Inputs, Forcings]:
     """Extracts data and forcings from xarray.Dataset."""
+    ref_datetime = self._structure.specs.aux_features['reference_datetime']
+    dataset = xarray_utils.ds_with_sim_time(
+        dataset,
+        self._structure.specs.physics_specs,
+        reference_datetime=ref_datetime,
+    )
     dataset_coords = model_builder.coordinate_system_from_dataset(dataset)
     if not np.allclose(
         dataset_coords.horizontal.longitudes,
