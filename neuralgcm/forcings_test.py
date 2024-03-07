@@ -14,6 +14,7 @@
 """Tests for forcings.py."""
 
 import functools
+from unittest import mock
 from absl.testing import absltest
 from absl.testing import parameterized
 from dinosaur import coordinate_systems
@@ -24,7 +25,6 @@ from dinosaur import spherical_harmonic
 from dinosaur import xarray_utils
 import haiku as hk
 import jax
-import jax.numpy as jnp
 from neuralgcm import forcings
 import numpy as np
 
@@ -63,7 +63,17 @@ class ForcingsTest(parameterized.TestCase):
     expected_forcing = {}
     self.assertEqual(forcing, expected_forcing)
 
+  def test_check_errors(self):
+    # The mock in test_dynamic_data_forcing checks that
+    # _FORCING_ERRORS.append was indeed called the correct number of times.
+
+    with self.assertRaisesRegex(forcings.ForcingDataError, 'forcing_sim_time'):
+      forcings._check_errors(err_list=['forcing_sim_time was bad'])
+
+  @mock.patch('neuralgcm.forcings._FORCING_ERRORS', new=mock.MagicMock(list))
   def test_dynamic_data_forcing(self):
+    forcings._check_errors()  # Should not raise
+
     physics_specs = primitive_equations.PrimitiveEquationsSpecs.from_si()
     one_hour_nondim = physics_specs.nondimensionalize(units.hour)
     n_times = 120
@@ -138,29 +148,27 @@ class ForcingsTest(parameterized.TestCase):
 
     with self.subTest('sim_time too small'):
       sim_time = -1 * one_hour_nondim
-      forcing = forcing_fn(params, forcing_data, sim_time)
-      np.testing.assert_allclose(forcing['sim_time'], jnp.nan)
-      np.testing.assert_allclose(forcing['snow_depth'], jnp.nan)
+      forcing_fn(params, forcing_data, sim_time)
+      self.assertEqual(1, forcings._FORCING_ERRORS.append.call_count)
 
     with self.subTest('sim_time too big'):
       sim_time = (n_times + 1) * one_hour_nondim
-      forcing = forcing_fn(params, forcing_data, sim_time)
-      np.testing.assert_allclose(forcing['sim_time'], jnp.nan)
-      np.testing.assert_allclose(forcing['snow_depth'], jnp.nan)
+      forcing_fn(params, forcing_data, sim_time)
+      self.assertEqual(2, forcings._FORCING_ERRORS.append.call_count)
 
     with self.subTest('sim_time is None'):
       sim_time = None
       with self.assertRaisesRegex(TypeError, 'unsupported operand'):
-        forcing = forcing_fn(params, forcing_data, sim_time)
+        forcing_fn(params, forcing_data, sim_time)
 
     with self.subTest('sim_time is nan'):
       # jax casts None to an array with nan
       sim_time = jax.numpy.asarray(None)  # = DeviceArray(nan, dtype=float32)
-      forcing = forcing_fn(params, forcing_data, sim_time)
       # inside forcing_fn, sim_time gets cast to int32
       # this is unsafe, since it turns nan into an actual integer,
       # idx=2147483647.
-      np.testing.assert_allclose(forcing['sim_time'], jnp.nan)
+      forcing_fn(params, forcing_data, sim_time)
+      self.assertEqual(3, forcings._FORCING_ERRORS.append.call_count)
 
     with self.subTest('vmap sim_time'):
       sim_time = sim_time_data[2:4]
@@ -324,6 +332,7 @@ class ForcingsTest(parameterized.TestCase):
       forcing = forcing_fn(params, forcing_data, sim_time)
       self.assertEqual(forcing['sea_surface_temperature'].shape, (1, 64, 32))
       np.testing.assert_allclose(forcing['sea_surface_temperature'], 334 + 2.5)
+
 
 if __name__ == '__main__':
   absltest.main()

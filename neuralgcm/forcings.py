@@ -19,15 +19,14 @@ import functools
 from typing import Any, Optional, Union
 
 from dinosaur import coordinate_systems
-from dinosaur import pytree_utils
 from dinosaur import scales
 from dinosaur import typing
 import gin
 import haiku as hk
 import jax
 import jax.numpy as jnp
-
 from neuralgcm import transforms
+import numpy as np
 
 tree_leaves = jax.tree_util.tree_leaves
 tree_map = jax.tree_util.tree_map
@@ -40,6 +39,17 @@ Forcing = typing.Forcing
 TransformModule = typing.TransformModule
 Quantity = units.Quantity
 QuantityOrStr = Union[str, scales.Quantity]
+
+
+# _FORCING_ERRORS global will store errors obtained during a io_callback.
+# The user can periodically call _check_errors to see if errors have accumulated
+# TODO(langmore) Use a more universal mechanism (not just in forcings.py) to
+# handle errors, if we like this, then make public.
+_FORCING_ERRORS = []
+
+
+class ForcingDataError(Exception):
+  """To raise when an error is encountered with forcing data."""
 
 
 @gin.register(denylist=['coords', 'dt', 'physics_specs', 'aux_features'])
@@ -140,6 +150,16 @@ class DynamicDataForcing(hk.Module):
     forcing = jax.tree_util.tree_map(
         lambda x: jnp.where(is_valid, x, jnp.nan), forcing
     )
+
+    # Also add errors (if any) to _FORCING_ERRORS so _check_errors can be called
+    # to raise.
+    jax.experimental.io_callback(
+        _check_sim_time_close_to_forcing_sim_time,
+        None,  # Returns None
+        sim_time=sim_time,
+        forcing_sim_time=forcing['sim_time'],
+        tolerance=self.dt_tolerance,
+    )
     return self.forcing_transform_fn(forcing)
 
 
@@ -226,3 +246,37 @@ def _assert_no_scalars(tree: Pytree):
   dims = tree_map(lambda x: len(jnp.shape(x)), tree)
   if not all(d > 0 for d in tree_leaves(dims)):
     raise ValueError(f'Scalar shapes encountered: {dims=}')
+
+
+# TODO(langmore) Use a more universal mechanism (not just in forcings.py) to
+# handle errors, if we like this, then make public.
+def _check_sim_time_close_to_forcing_sim_time(
+    sim_time: np.ndarray,
+    forcing_sim_time: np.ndarray,
+    tolerance: float,
+) -> None:
+  """Checks |sim_time - forcing_sim_time| < tolerance add to _FORCING_ERRORS."""
+  abs_error = np.abs(forcing_sim_time - sim_time)
+  if abs_error < tolerance:
+    return
+  err_msg = (
+      f'{sim_time=} differed from {forcing_sim_time=} by {abs_error=} which is '
+      f'> {tolerance=}'
+  )
+  _FORCING_ERRORS.append(err_msg)
+
+
+# TODO(langmore) Use a more universal mechanism (not just in forcings.py) to
+# handle errors, if we like this, then make public.
+def _check_errors(  # pylint: disable=dangerous-default-value
+    max_to_print: int = 4,
+    err_list: list[str] = _FORCING_ERRORS,
+) -> None:
+  """Check err_list and raise ForcingDataError if nonempty."""
+  n_err = len(err_list)
+  if n_err:
+    raise ForcingDataError(
+        f'ForcingDataError found: {n_err} exceptions: '
+        f'The first {min(n_err, max_to_print)} are: '
+        f'{", ".join(err_list[:max_to_print])}'
+    )
