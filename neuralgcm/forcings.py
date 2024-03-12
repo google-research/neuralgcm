@@ -95,10 +95,13 @@ class DynamicDataForcing(hk.Module):
       inputs_to_units_mapping: dict[str, str],
       forcing_transform: TransformModule = transforms.IdentityTransform,
       time_axis: int = 0,
-      data_time_step: Union[float, QuantityOrStr] = '1 hour',
+      data_time_step: float | QuantityOrStr | None = None,
       dt_tolerance: Union[float, QuantityOrStr] = '1 hour',
       name: Optional[str] = None,
   ):
+    # TODO(shoyer): remove data_time_step entirely, once we're sure that no
+    # saved checkpoints that we care about will break.
+    del data_time_step  # no longer used
     super().__init__(name=name)
     self.time_axis = time_axis
     self.nondim_transform_fn = transforms.NondimensionalizeTransform(
@@ -112,11 +115,6 @@ class DynamicDataForcing(hk.Module):
     self.forcing_transform_fn = forcing_transform(
         coords, dt, physics_specs, aux_features
     )
-    if isinstance(data_time_step, (str, scales.Quantity)):
-      data_time_step = physics_specs.nondimensionalize(
-          scales.Quantity(data_time_step)
-      )
-    self.data_time_step = data_time_step
     if isinstance(dt_tolerance, (str, scales.Quantity)):
       dt_tolerance = physics_specs.nondimensionalize(
           scales.Quantity(dt_tolerance)
@@ -130,13 +128,15 @@ class DynamicDataForcing(hk.Module):
   ) -> Forcing:
     """Returns forcings at the specified sim_time."""
     forcing_data = self.nondim_transform_fn(forcing_data)
-    relative_time = sim_time - forcing_data['sim_time'][0]
-    idx = jnp.round(relative_time / self.data_time_step).astype('int32')
+
+    times = forcing_data['sim_time']
+    approx_index = jnp.interp(sim_time, times, jnp.arange(times.size))
+    index = jnp.round(approx_index).astype('int32')
 
     # Slice leaf values by index
     field_index_fn = functools.partial(
         jax.lax.dynamic_index_in_dim,
-        index=idx,
+        index=index,
         axis=self.time_axis,
         keepdims=False,
     )

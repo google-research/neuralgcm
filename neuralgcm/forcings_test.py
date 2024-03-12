@@ -146,6 +146,18 @@ class ForcingsTest(parameterized.TestCase):
       np.testing.assert_allclose(forcing['snow_depth'],
                                  nondim_snow_depth, atol=1e-6)
 
+    with self.subTest('thinned sim_time'):
+      for idx, sim_time in list(enumerate(sim_time_data))[::10]:
+        thinned_forcing_data = {k: v[::10] for k, v in forcing_data.items()}
+        forcing = forcing_fn(params, thinned_forcing_data, sim_time)
+        self.assertFalse(np.any(np.isnan(forcing['sim_time'])))
+        np.testing.assert_allclose(forcing['sim_time'], sim_time)
+        np.testing.assert_allclose(forcing['snow_temperature'], 260)
+        nondim_snow_depth = self.physics_specs.nondimensionalize(
+            idx * units.meter)
+        np.testing.assert_allclose(forcing['snow_depth'],
+                                   nondim_snow_depth, atol=1e-6)
+
     with self.subTest('sim_time too small'):
       sim_time = -1 * one_hour_nondim
       forcing_fn(params, forcing_data, sim_time)
@@ -158,7 +170,7 @@ class ForcingsTest(parameterized.TestCase):
 
     with self.subTest('sim_time is None'):
       sim_time = None
-      with self.assertRaisesRegex(TypeError, 'unsupported operand'):
+      with self.assertRaises(TypeError):
         forcing_fn(params, forcing_data, sim_time)
 
     with self.subTest('sim_time is nan'):
