@@ -246,7 +246,7 @@ class PressureLevelModel:
     sim_time = _sim_time_from_state(state)
     forcings = _prepend_dummy_time_axis(forcings)
     f = self._structure.forcing_fn(self.params, None, forcings, sim_time)
-    state = self._structure.advance(self.params, rng_key, state, f)
+    state = self._structure.advance_fn(self.params, rng_key, state, f)
     return state
 
   @jax.jit
