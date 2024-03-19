@@ -160,12 +160,12 @@ class ForcingsTest(parameterized.TestCase):
 
     with self.subTest('sim_time too small'):
       sim_time = -1 * one_hour_nondim
-      forcing_fn(params, forcing_data, sim_time)
+      jax.block_until_ready(forcing_fn(params, forcing_data, sim_time))
       self.assertEqual(1, forcings._FORCING_ERRORS.append.call_count)
 
     with self.subTest('sim_time too big'):
       sim_time = (n_times + 1) * one_hour_nondim
-      forcing_fn(params, forcing_data, sim_time)
+      jax.block_until_ready(forcing_fn(params, forcing_data, sim_time))
       self.assertEqual(2, forcings._FORCING_ERRORS.append.call_count)
 
     with self.subTest('sim_time is None'):
@@ -179,7 +179,7 @@ class ForcingsTest(parameterized.TestCase):
       # inside forcing_fn, sim_time gets cast to int32
       # this is unsafe, since it turns nan into an actual integer,
       # idx=2147483647.
-      forcing_fn(params, forcing_data, sim_time)
+      jax.block_until_ready(forcing_fn(params, forcing_data, sim_time))
       self.assertEqual(3, forcings._FORCING_ERRORS.append.call_count)
 
     with self.subTest('vmap sim_time'):
