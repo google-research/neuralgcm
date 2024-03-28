@@ -33,10 +33,19 @@ from neuralgcm import model_utils
 import numpy as np
 
 
+tree_map = jax.tree_util.tree_map
+tree_leaves = jax.tree_util.tree_leaves
 units = scales.units
 Pytree = typing.Pytree
 
 EPS_f32 = jnp.finfo(jnp.float32).eps
+
+
+class SimpleModelFromTrajectory:
+  def __init__(self, trajectory_fn):
+    self.trajectory = trajectory_fn
+    self.encode = lambda x, forcing: x
+    self.forcing_fn = lambda x, t: {}
 
 
 class WithForcingTest(parameterized.TestCase):
@@ -202,6 +211,280 @@ class WithForcingTest(parameterized.TestCase):
         x=input_state,
         )
     self.assertTreeAllClose(output_state, expected)
+
+
+class TrajectoryWithStopGradientsTest(parameterized.TestCase):
+
+  def _linear_growth_trajectory_fn(self, theta):
+    """X[t] = X[t-1] + theta."""
+
+    def trajectory_fn(
+        x, forcing_data, outer_steps, inner_steps, start_with_input=False
+    ):
+      legs = [x]
+      for _ in range(outer_steps):
+        legs.append(
+            tree_map(
+                lambda x_i: x_i
+                + theta**inner_steps
+                + forcing_data.get('force', 0),
+                legs[-1],
+            )
+        )
+      final_state = legs[-1]
+      legs = legs[:-1] if start_with_input else legs[1:]
+
+      trajectory = tree_map(
+          lambda *items: jnp.stack(items),
+          legs[0],
+          *legs[1:],
+      )
+      return final_state, trajectory
+
+    return trajectory_fn
+
+  def test_final_state_and_slice_correct_simple(self):
+    theta = 3
+    outer_steps = 2
+
+    model = SimpleModelFromTrajectory(
+        # X[t] = X[0] + t * theta
+        self._linear_growth_trajectory_fn(theta)
+    )
+    def call_trajectory_fn(start_with_input):
+      trajectory_fn = (
+          model_utils.trajectory_with_inputs_and_forcing_and_stop_gradients(
+              model,
+              num_init_frames=1,
+              start_with_input=start_with_input,
+              stop_gradient_outer_steps=(),
+          )
+      )
+      x = {'X': jnp.array(0.0)}  # Start at 0 ==> X[t] = t * theta
+      return trajectory_fn(
+          x, forcing_data={}, outer_steps=outer_steps, inner_steps=1
+      )
+
+    full_trajectory = 0 + np.arange(outer_steps + 1) * theta
+
+    with self.subTest('start_with_input=True'):
+      final_state, trajectory = call_trajectory_fn(start_with_input=True)
+      self.assertEqual(final_state, {'X': full_trajectory[-1]})
+      self.assertCountEqual(trajectory, ['X'])
+      np.testing.assert_array_equal(trajectory['X'], full_trajectory[:-1])
+
+    with self.subTest('start_with_input=False'):
+      final_state, trajectory = call_trajectory_fn(start_with_input=False)
+      self.assertEqual(final_state, {'X': full_trajectory[-1]})
+      self.assertCountEqual(trajectory, ['X'])
+      np.testing.assert_array_equal(trajectory['X'], full_trajectory[1:])
+
+  @parameterized.named_parameters(
+      dict(
+          testcase_name='NoStopGrad_YesStartWithInput',
+          outer_steps=3,
+          stop_gradient_outer_steps=(),
+          start_with_input=True,
+      ),
+      dict(
+          testcase_name='StopGrad13_YesStartWithInput',
+          outer_steps=5,
+          stop_gradient_outer_steps=(1, 3),
+          start_with_input=True,
+      ),
+      dict(
+          testcase_name='NoStopGrad_NoStartWithInput',
+          outer_steps=3,
+          stop_gradient_outer_steps=(),
+          start_with_input=False,
+      ),
+      dict(
+          testcase_name='StopGrad13_NoStartWithInput',
+          outer_steps=5,
+          stop_gradient_outer_steps=(1, 3),
+          start_with_input=False,
+      ),
+      dict(
+          testcase_name='StopGrad5_NoStartWithInput',
+          outer_steps=5,
+          stop_gradient_outer_steps=(5,),
+          start_with_input=False,
+      ),
+  )
+  def test_trajectory_matches_non_stop_grad_function(
+      self,
+      outer_steps,
+      stop_gradient_outer_steps,
+      start_with_input,
+      inner_steps=2,
+      force=3,
+  ):
+    # Test against a function where the gradients can be computed by hand.
+    x = {'X': jnp.array(2.0)}
+
+    model = SimpleModelFromTrajectory(
+        self._linear_growth_trajectory_fn(theta=1.3)
+    )
+
+    final_state, y = (
+        model_utils.trajectory_with_inputs_and_forcing_and_stop_gradients(
+            model,
+            num_init_frames=1,
+            start_with_input=start_with_input,
+            stop_gradient_outer_steps=stop_gradient_outer_steps,
+        )
+    )(
+        x,
+        forcing_data={'force': force},
+        outer_steps=outer_steps,
+        inner_steps=inner_steps,
+    )
+
+    final_state_nostopgrad, y_nostopgrad = (
+        model_utils.trajectory_with_inputs_and_forcing(
+            model,
+            num_init_frames=1,
+            start_with_input=start_with_input,
+        )
+    )(
+        x,
+        forcing_data={'force': force},
+        outer_steps=outer_steps,
+        inner_steps=inner_steps,
+    )
+
+    self.assertCountEqual(['X'], final_state)
+    np.testing.assert_array_equal(final_state['X'], final_state_nostopgrad['X'])
+    np.testing.assert_array_equal(y['X'], y_nostopgrad['X'])
+
+  @parameterized.named_parameters(
+      dict(
+          testcase_name='NoStopGrad_YesStartWithInput',
+          outer_steps=3,
+          stop_gradient_outer_steps=(),
+          start_with_input=True,
+      ),
+      dict(
+          testcase_name='StopGrad13_YesStartWithInput',
+          outer_steps=5,
+          stop_gradient_outer_steps=(1, 3),
+          start_with_input=True,
+      ),
+      dict(
+          testcase_name='StopGrad1_YesStartWithInput',
+          outer_steps=5,
+          stop_gradient_outer_steps=(1,),
+          start_with_input=True,
+      ),
+      dict(
+          testcase_name='StopGrad5_YesStartWithInput',
+          outer_steps=5,
+          stop_gradient_outer_steps=(5,),
+          start_with_input=True,
+      ),
+      dict(
+          testcase_name='NoStopGrad_NoStartWithInput',
+          outer_steps=3,
+          stop_gradient_outer_steps=(),
+          start_with_input=False,
+      ),
+      dict(
+          testcase_name='StopGrad13_NoStartWithInput',
+          outer_steps=5,
+          stop_gradient_outer_steps=(1, 3),
+          start_with_input=False,
+      ),
+      dict(
+          testcase_name='StopGrad1_NoStartWithInput',
+          outer_steps=5,
+          stop_gradient_outer_steps=(1,),
+          start_with_input=False,
+      ),
+      dict(
+          testcase_name='StopGrad5_NoStartWithInput',
+          outer_steps=5,
+          stop_gradient_outer_steps=(5,),
+          start_with_input=False,
+      ),
+  )
+  def test_stop_gradient_gives_expected_results(
+      self, outer_steps, stop_gradient_outer_steps, start_with_input
+  ):
+    # Test against a function where the gradients can be computed by hand.
+    x = {'X': jnp.array(0.0)}
+
+    def start_with_input_slicer(iterable):
+      """Slice iterable to either `start_with_input` or not."""
+      iterable = np.array(list(iterable))
+      return iterable[:-1] if start_with_input else iterable[1:]
+
+    # Weight the loss by time. This ensures the test pinpoints errors that occur
+    # at different times.
+    time_weights = start_with_input_slicer(10 ** np.arange(outer_steps + 1))
+
+    def loss_fn(theta):
+      """Loss = 0.5 * Sum(weight[t] * X[t]²), with stop grads."""
+      model = SimpleModelFromTrajectory(
+          self._linear_growth_trajectory_fn(theta)
+      )
+      trajectory_fn = (
+          model_utils.trajectory_with_inputs_and_forcing_and_stop_gradients(
+              model,
+              num_init_frames=1,
+              start_with_input=start_with_input,
+              stop_gradient_outer_steps=stop_gradient_outer_steps,
+          )
+      )
+      unused_final_state, y = trajectory_fn(
+          x, forcing_data={}, outer_steps=outer_steps, inner_steps=1
+      )
+      loss_parts = tree_map(lambda x: 0.5 * jnp.sum(time_weights * x**2), y)
+      return sum(tree_leaves(loss_parts))
+
+    theta = 2.0
+    loss = loss_fn(theta)
+    grad_loss = jax.grad(loss_fn)(theta)
+
+    # Recall _linear_growth_trajectory_fn ==> X[t] = t * theta.
+    expected_trajectory = (
+        start_with_input_slicer(range(outer_steps + 1)) * theta
+    )
+    expected_loss = 0.5 * np.sum(time_weights * expected_trajectory**2)
+    self.assertEqual(loss, expected_loss)
+
+    # The gradient can be computed explicitly:
+    #  Loss = Sum(Lossₜ),
+    #  with t in {0, ..., outer_steps - 1} if start_with_input,
+    #  and t in {1, ..., outer_steps} otherwise.
+    # With Wₜ the time weights, we have
+    #  Lossₜ = Wₜ Xₜ² / 2
+    # and of course Xₜ is a function of (Xₜ₋₁, θ). That is,
+    #   Xₜ = Xₜ(Xₜ₋₁, θ) = Xₜ₋₁ + θ, with X₀ = 0.
+    # therefore,
+    #  d Lossₜ / dθ = (∂Lossₜ/∂Xₜ) (dXₜ/dθ)
+    #               = (Wₜ Xₜ) (∂Xₜ/∂θ + ∂Xₜ/∂Xₜ₋₁ dXₜ₋₁/dθ)
+    # This recurses until you get to dX₀/dθ, which equals 0.
+    # For t > 0, when there is NO stop gradient on Xₜ, ∂Xₜ/∂θ ≡ 1, and
+    # ∂Xₜ/∂Xₜ₋₁ ≡ 1 as well. When there is a stop gradient, the these both equal
+    # zero.  This means
+    #  d Lossₜ / dθ = (Wₜ Xₜ) * Kₜ
+    # where Kₜ is the length of the non-stop gradient backwards trajectory,
+    # starting at t.
+    expected_grad = 0
+    for t_i in range(outer_steps):
+      # t_i indexes into trajectory.  t is the actual time at index t_i.
+      t = t_i if start_with_input else t_i + 1
+      n_non_stop_grad_contributing_terms = 0
+      for s in reversed(range(1, t + 1)):
+        if s in stop_gradient_outer_steps:
+          break
+        n_non_stop_grad_contributing_terms += 1
+      expected_grad += (
+          time_weights[t_i]
+          * expected_trajectory[t_i]
+          * n_non_stop_grad_contributing_terms
+      )
+    self.assertEqual(expected_grad, grad_loss)
 
 
 class ComputeRepresentationsTest(parameterized.TestCase):
