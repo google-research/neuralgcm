@@ -130,7 +130,7 @@ class TrajectoryShape:
           self.n_total_wavenumbers,
       )
 
-    is_compliant = tree_map(lambda x: x.shape == expected_shape, trajectory)
+    is_compliant = tree_map(lambda x: np.shape(x) == expected_shape, trajectory)
     if not all(tree_leaves(is_compliant)):
       shapes = tree_map(np.shape, trajectory)
       raise ShapeError(

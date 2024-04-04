@@ -130,7 +130,7 @@ class EncodersTest(parameterized.TestCase):
     params = encoder_model.init(rng, inputs)
     encoded_state = (encoder_model.apply(params, rng, inputs).state).asdict()
 
-    get_shape_fn = lambda tree: jax.tree_map(lambda x: x.shape, tree)
+    get_shape_fn = lambda tree: jax.tree_map(np.shape, tree)
     expected_shapes = primitive_equations.StateWithTime(
         divergence=coords.modal_shape,
         vorticity=coords.modal_shape,

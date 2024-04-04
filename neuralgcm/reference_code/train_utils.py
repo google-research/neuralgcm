@@ -265,7 +265,7 @@ def add_noise_to_input_frame(
   """
   del kwargs  # unused.
   time_zero_slice = pytree_utils.slice_along_axis(batch, 1, 0)
-  shapes = jax.tree.map(lambda x: x.shape, time_zero_slice)
+  shapes = jax.tree.map(np.shape, time_zero_slice)
   rngs = jax.random.split(rng, len(jax.tree.leaves(time_zero_slice)))
   rngs = jax.tree.unflatten(jax.tree.structure(time_zero_slice), rngs)
 

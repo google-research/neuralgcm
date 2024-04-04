@@ -127,7 +127,7 @@ class ShallowWaterTest(parameterized.TestCase):
     rng_key = jax.random.PRNGKey(42)
     params = model.init_params(rng_key, data_trajectory, forcing_data)
 
-    get_shape_fn = lambda tree: jax.tree_util.tree_map(lambda x: x.shape, tree)
+    get_shape_fn = lambda tree: jax.tree_util.tree_map(np.shape, tree)
 
     with self.subTest('encoder'):
       actual = jax.tree_util.tree_leaves(
@@ -386,7 +386,7 @@ class PrimitiveEquationsTest(parameterized.TestCase):
 
     rng_key = jax.random.PRNGKey(42)
     params = model.init_params(rng_key, data_trajectory, forcing_data)
-    get_shape_fn = lambda tree: jax.tree_util.tree_map(lambda x: x.shape, tree)
+    get_shape_fn = lambda tree: jax.tree_util.tree_map(np.shape, tree)
 
     with self.subTest('encoder'):
       actual = jax.tree_util.tree_leaves(
