@@ -226,15 +226,14 @@ class BaseRandomFieldTest(parameterized.TestCase):
             var_tol_in_standard_errs=var_tol_in_standard_errs,
         )
 
-    rngs = jax.random.split(jax.random.PRNGKey(13), unroll_length)
-    rngs = jax.vmap(jax.random.split, in_axes=(0, None))(rngs, n_samples)
-
-    def step_fn(c, x):
-      next_c = jax.vmap(random_field.advance)(c, rng=x)
+    def step_fn(c, _):
+      next_c = jax.vmap(random_field.advance)(c)
       next_output = jax.vmap(random_field.to_nodal_values)(next_c.core)
       return (next_c, next_output)
 
-    _, field_trajectory = jax.lax.scan(step_fn, initial_states, xs=rngs)
+    _, field_trajectory = jax.lax.scan(
+        step_fn, initial_states, xs=None, length=unroll_length
+    )
     field_trajectory = jax.device_get(field_trajectory)
 
     if run_correlation_time_check and variance is not None:
@@ -505,7 +504,6 @@ class BatchGaussianRandomFieldModuleTest(BaseRandomFieldTest):
 
     @hk.transform
     def make_field_trajectory(key):
-      init_key, key = jax.random.split(key)
       grf = self._make_grf(
           variances=variances,
           initial_correlation_lengths=initial_correlation_lengths,
@@ -513,16 +511,16 @@ class BatchGaussianRandomFieldModuleTest(BaseRandomFieldTest):
           # Do not specify the field names... Let the default naming happen.
           field_subset=field_subset,
       )
-      sample = grf.unconditional_sample(init_key)
+      sample = grf.unconditional_sample(key)
 
-      step_keys = jax.random.split(key, unroll_length)
-
-      def step_fn(c, x):
-        next_c = grf.advance(state=c, rng=x)
+      def step_fn(c, _):
+        next_c = grf.advance(c)
         next_output = next_c.nodal_value
         return (next_c, next_output)
 
-      _, trajectory = jax.lax.scan(step_fn, sample, xs=step_keys)
+      _, trajectory = jax.lax.scan(
+          step_fn, sample, xs=None, length=unroll_length
+      )
       return sample, jax.device_get(trajectory)
 
     n_samples = 2000

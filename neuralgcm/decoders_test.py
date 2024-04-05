@@ -126,7 +126,7 @@ class DecodersTest(parameterized.TestCase):
         ),
         memory=None,
         diagnostics=None,
-        randomness=jnp.zeros(coords.modal_shape),
+        randomness=typing.RandomnessState(),
     )
 
     def decode_fwd(inputs):

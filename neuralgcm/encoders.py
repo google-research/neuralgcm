@@ -599,7 +599,9 @@ class LearnedWeatherbenchToPrimitiveEncoder(WeatherbenchToPrimitiveEncoder):
       inputs: DataState,
       forcing: Forcing,
   ) -> ModelState:
-    randomness = self.randomness_fn.unconditional_sample(hk.next_rng_key())
+    randomness = self.randomness_fn.unconditional_sample(
+        hk.maybe_next_rng_key()
+    )
     wb_state = self.coords.with_physics_sharding(
         weatherbench_utils.State(**self.slice_fn(inputs))
     )

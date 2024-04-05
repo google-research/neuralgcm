@@ -14,7 +14,9 @@
 """Defines `decoder` modules that map model state to output data format."""
 
 import functools
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, Optional, Tuple, TypeVar
+import zlib
+
 from dinosaur import coordinate_systems
 from dinosaur import primitive_equations
 from dinosaur import pytree_utils
@@ -500,6 +502,19 @@ class PrimitiveToWeatherbenchDecoder(hk.Module):
     return self.transform_fn(wb_on_sigma.asdict())
 
 
+_DECODER_SALT = zlib.crc32(b'decoder')  # arbitrary uint32 value
+
+
+def _decoder_prng_key(
+    randomness: typing.RandomnessState,
+) -> typing.PRNGKeyArray | None:
+  """Get a PRNG Key suitable for decoder randomness."""
+  if randomness.prng_key is None:
+    return None
+  salt = jnp.uint32(_DECODER_SALT) + jnp.uint32(randomness.prng_step)
+  return jax.random.fold_in(randomness.prng_key, salt)
+
+
 @gin.register
 class LearnedPrimitiveToWeatherbenchDecoder(PrimitiveToWeatherbenchDecoder):
   """Similar to `PrimitiveToWeatherbenchDecoder` with learned interpolation."""
@@ -567,7 +582,7 @@ class LearnedPrimitiveToWeatherbenchDecoder(PrimitiveToWeatherbenchDecoder):
       self, inputs: ModelState, forcing: Forcing
   ) -> DataState:
     randomness = self.randomness_fn.unconditional_sample(
-        hk.next_rng_key()
+        _decoder_prng_key(inputs.randomness)
     )
     prognostics = self.perturbation_fn(
         inputs=self.coords.with_dycore_sharding(inputs.state),

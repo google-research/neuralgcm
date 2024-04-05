@@ -83,7 +83,9 @@ class BaseStep(abc.ABC):
     Returns:
       Initialized model state.
     """
-    x.randomness = self.randomness_fn.unconditional_sample(hk.next_rng_key())
+    x.randomness = self.randomness_fn.unconditional_sample(
+        hk.maybe_next_rng_key()
+    )
     x.diagnostics = self.diagnostics_fn(
         x, physics_tendencies=None, forcing=forcing)
     return x
@@ -259,7 +261,9 @@ class StochasticPhysicsParameterizationStep(BaseStep, hk.Module):
       Initialized model state.
     """
     # TODO(dkochkov) Consider adding an option of not overriding randomness.
-    x.randomness = self.randomness_fn.unconditional_sample(hk.next_rng_key())
+    x.randomness = self.randomness_fn.unconditional_sample(
+        hk.maybe_next_rng_key()
+    )
     pp_tendency = self.physics_parameterization_fn(
         x.state, x.memory, x.diagnostics, x.randomness.nodal_value, forcing
     )
@@ -288,8 +292,7 @@ class StochasticPhysicsParameterizationStep(BaseStep, hk.Module):
 
       next_state = self.corrector_fn(x.state, pp_tendency, forcing)
       # TODO(dkochkov) update stochastic modules to take optional state.
-      next_randomness = self.randomness_fn.advance(
-          x.randomness, rng=hk.next_rng_key())
+      next_randomness = self.randomness_fn.advance(x.randomness)
       next_memory = x.state if x.memory is not None else None
       next_diagnostics = self.diagnostics_fn(x, pp_tendency)
       x_next = ModelState(

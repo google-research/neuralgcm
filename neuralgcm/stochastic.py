@@ -14,9 +14,11 @@
 """Implementation of stochastic modules."""
 
 import abc
+import dataclasses
 import enum
 import logging
-from typing import Any, Callable, Optional, Sequence, Union
+from typing import Any, Callable, Optional, Sequence, TypeVar, Union
+import zlib
 
 from dinosaur import coordinate_systems
 from dinosaur import typing
@@ -83,19 +85,11 @@ class RandomField(abc.ABC):
     """The PreferredRepresentation for this field, or None if no preference."""
 
   @abc.abstractmethod
-  def unconditional_sample(
-      self,
-      rng: typing.PRNGKeyArray,
-  ) -> RandomnessState:
+  def unconditional_sample(self, rng: typing.PRNGKeyArray) -> RandomnessState:
     """Sample the random field unconditionally."""
 
   @abc.abstractmethod
-  def advance(
-      self,
-      state: RandomnessState,
-      *,
-      rng: typing.PRNGKeyArray,
-  ) -> RandomnessState:
+  def advance(self, state: RandomnessState) -> RandomnessState:
     """Updates the core state of a random field."""
 
   @abc.abstractmethod
@@ -108,6 +102,22 @@ class RandomField(abc.ABC):
 
 
 RandomnessModule = Callable[..., RandomField]
+
+
+_ADVANCE_SALT = zlib.crc32(b'advance')  # arbitrary uint32 value
+
+
+T = TypeVar('T', typing.PRNGKeyArray, None)
+
+
+def _prng_key_for_current_advance_step(
+    randomness: typing.RandomnessState,
+) -> typing.PRNGKeyArray | None:
+  """Get a PRNG Key suitable for randomness in the current advance step."""
+  if randomness.prng_key is None:
+    return None
+  salt = jnp.uint32(_ADVANCE_SALT) + jnp.uint32(randomness.prng_step)
+  return jax.random.fold_in(randomness.prng_key, salt)
 
 
 @gin.register
@@ -140,22 +150,16 @@ class NoRandomField(RandomField):
     return None
 
   def unconditional_sample(
-      self,
-      rng: typing.PRNGKeyArray,
+      self, rng: typing.PRNGKeyArray | None
   ) -> RandomnessState:
     """Returns a zeros initialized state."""
-    del rng  # unused
-    return RandomnessState()  # default to None elements.
+    return RandomnessState(prng_key=rng, prng_step=0)
 
-  def advance(
-      self,
-      state: RandomnessState,
-      *,
-      rng: typing.PRNGKeyArray,
-  ) -> RandomnessState:
+  def advance(self, state: RandomnessState) -> RandomnessState:
     """Updates the state of a random gaussian field."""
-    del state, rng  # unused.
-    return RandomnessState()  # defaults to None elements.
+    return RandomnessState(
+        prng_key=state.prng_key, prng_step=state.prng_step + 1
+    )
 
   def to_nodal_values(self, core_state: CoreRandomState) -> typing.Array | None:
     del core_state  # unused.
@@ -202,11 +206,9 @@ class ZerosRandomField(RandomField):
       return PreferredRepresentation.MODAL
 
   def unconditional_sample(
-      self,
-      rng: typing.PRNGKeyArray,
+      self, rng: typing.PRNGKeyArray | None
   ) -> RandomnessState:
     """Returns a zeros initialized state."""
-    del rng  # unused
     if self._prefer_nodal:
       core = jnp.zeros(self.coords.horizontal.nodal_shape)
     else:
@@ -215,21 +217,19 @@ class ZerosRandomField(RandomField):
         core=core,
         nodal_value=jnp.zeros(self.coords.horizontal.nodal_shape),
         modal_value=jnp.zeros(self.coords.horizontal.modal_shape),
+        prng_key=rng,
+        prng_step=0,
     )
 
-  def advance(
-      self,
-      state: RandomnessState,
-      *,
-      rng: typing.PRNGKeyArray,
-  ) -> RandomnessState:
+  def advance(self, state: RandomnessState) -> RandomnessState:
     """Updates the state of a random gaussian field."""
-    del rng  # unused
     _validate_randomness_state(state)
     return RandomnessState(
         core=jnp.zeros_like(state.core),
         nodal_value=jnp.zeros(self.coords.horizontal.nodal_shape),
         modal_value=jnp.zeros(self.coords.horizontal.modal_shape),
+        prng_key=state.prng_key,
+        prng_step=state.prng_step + 1,
     )
 
   def to_nodal_values(self, core_state: CoreRandomState) -> typing.Array | None:
@@ -355,17 +355,17 @@ class GaussianRandomField(RandomField):
     # have L2 norm = radius.  See http://screen/9FYVXZ5cMHoGDZk
     return normalization * sigmas_unnormed / self.coords.horizontal.radius
 
-  def unconditional_sample(
-      self,
-      rng: typing.PRNGKeyArray,
-  ) -> RandomnessState:
+  def unconditional_sample(self, rng: typing.PRNGKeyArray) -> RandomnessState:
     """Returns a randomly initialized state for the autoregressive process."""
     modal_shape = self.coords.horizontal.modal_shape
+    rng, next_rng = jax.random.split(rng)
     if self.variance is None:
       return RandomnessState(
           core=jnp.zeros(modal_shape),
           nodal_value=jnp.zeros(self.coords.horizontal.nodal_shape),
           modal_value=jnp.zeros(modal_shape),
+          prng_key=next_rng,
+          prng_step=0,
       )
     sigmas = self._sigma_array()
     weights = jnp.where(
@@ -378,14 +378,11 @@ class GaussianRandomField(RandomField):
         core=core,
         nodal_value=self.to_nodal_values(core),
         modal_value=self.to_modal_values(core),
+        prng_key=next_rng,
+        prng_step=0,
     )
 
-  def advance(
-      self,
-      state: RandomnessState,
-      *,
-      rng: typing.PRNGKeyArray,
-  ) -> RandomnessState:
+  def advance(self, state: RandomnessState) -> RandomnessState:
     """Updates the CoreRandomState of a random gaussian field."""
     _validate_randomness_state(state)
     if self.variance is None:
@@ -393,8 +390,11 @@ class GaussianRandomField(RandomField):
           core=jnp.zeros_like(state.core),
           nodal_value=jnp.zeros(self.coords.horizontal.nodal_shape),
           modal_value=jnp.zeros(self.coords.horizontal.modal_shape),
+          prng_key=state.prng_key,
+          prng_step=state.prng_step + 1,
       )
     modal_shape = self.coords.horizontal.modal_shape
+    rng = _prng_key_for_current_advance_step(state)
     eta = jax.random.truncated_normal(rng, -self.clip, self.clip, modal_shape)
     next_core = state.core * self.phi + self._sigma_array() * jnp.where(
         self.coords.horizontal.mask, eta, jnp.zeros(modal_shape)
@@ -403,6 +403,8 @@ class GaussianRandomField(RandomField):
         core=next_core,
         nodal_value=self.to_nodal_values(next_core),
         modal_value=self.to_modal_values(next_core),
+        prng_key=state.prng_key,
+        prng_step=state.prng_step + 1,
     )
 
   @property
@@ -722,10 +724,7 @@ class BatchGaussianRandomFieldModule(hk.Module):
   def n_fields(self) -> int:
     return self._n_fields
 
-  def unconditional_sample(
-      self,
-      rng: typing.PRNGKeyArray,
-  ) -> RandomnessState:
+  def unconditional_sample(self, rng: typing.PRNGKeyArray) -> RandomnessState:
     """Sample the batch GRFs unconditionally."""
     logging.info(
         '[NGCM] Calling BatchGaussianRandomFieldModule.unconditional_sample'
@@ -737,32 +736,37 @@ class BatchGaussianRandomFieldModule(hk.Module):
       rf = self._make_rf(correlation_time, correlation_length, variance)
       return rf.unconditional_sample(key)
 
-    return jax.vmap(_unconditional_sample_one_rf)(
-        jax.random.split(rng, self.n_fields),
+    rngs = jax.random.split(rng, self.n_fields + 1)
+    rngs, next_rng = rngs[:-1], rngs[-1]
+    sample = jax.vmap(_unconditional_sample_one_rf)(
+        rngs,
         self._correlation_times,
         self._correlation_lengths,
         self._variances,
     )
+    # We have RNG keys and steps associated with each field from vmap, but
+    # RandomnessState should only have a single (scalar) RNG key/step.
+    return dataclasses.replace(sample, prng_key=next_rng, prng_step=0)
 
-  def advance(
-      self,
-      state: RandomnessState,
-      *,
-      rng: typing.PRNGKeyArray,
-  ) -> RandomnessState:
+  def advance(self, state: RandomnessState) -> RandomnessState:
     """Updates the state of the batch of GRFs."""
     logging.info('[NGCM] Calling BatchGaussianRandomFieldModule.advance')
 
-    def _advance_one_rf(s, key, correlation_time, correlation_length, variance):
+    def _advance_one_rf(state, correlation_time, correlation_length, variance):
       rf = self._make_rf(correlation_time, correlation_length, variance)
-      return rf.advance(state=s, rng=key)
+      return rf.advance(state)
 
-    return jax.vmap(_advance_one_rf)(
-        state,
-        jax.random.split(rng, self.n_fields),
+    rng = _prng_key_for_current_advance_step(state)
+    rngs = jax.random.split(rng, self.n_fields)
+    steps = jnp.ones(self.n_fields, int) * state.prng_step
+    advanced = jax.vmap(_advance_one_rf)(
+        dataclasses.replace(state, prng_key=rngs, prng_step=steps),
         self._correlation_times,
         self._correlation_lengths,
         self._variances,
+    )
+    return dataclasses.replace(
+        advanced, prng_key=state.prng_key, prng_step=state.prng_step + 1
     )
 
 
@@ -878,17 +882,13 @@ class DictOfGaussianRandomFieldModules(hk.Module):
   def field_names(self) -> tuple[str, ...]:
     return self._field_names
 
-  def unconditional_sample(
-      self,
-      rng: typing.PRNGKeyArray,
-  ) -> RandomnessState:
+  def unconditional_sample(self, rng: typing.PRNGKeyArray) -> RandomnessState:
     """Sample the random field unconditionally."""
     core = {}
     nodal_values = {}
     modal_values = {}
-    for (name, rf), sample_key in zip(
-        self._random_fields.items(), jax.random.split(rng, self.n_fields)
-    ):
+    *rngs, next_rng = jax.random.split(rng, self.n_fields + 1)
+    for (name, rf), sample_key in zip(self._random_fields.items(), rngs):
       rvs = rf.unconditional_sample(sample_key)
       core[name] = rvs.core
       nodal_values[name] = rvs.nodal_value
@@ -897,23 +897,22 @@ class DictOfGaussianRandomFieldModules(hk.Module):
         core=core,
         nodal_value=nodal_values,
         modal_value=modal_values,
+        prng_key=next_rng,
+        prng_step=0,
     )
 
-  def advance(
-      self,
-      state: RandomnessState,
-      *,
-      rng: typing.PRNGKeyArray,
-  ) -> RandomnessState:
+  def advance(self, state: RandomnessState) -> RandomnessState:
     """Updates the core state of a random field."""
     core = {}
     nodal_values = {}
     modal_values = {}
-    for (name, rf), sample_key in zip(
-        self._random_fields.items(), jax.random.split(rng, self.n_fields)
-    ):
+    rng = _prng_key_for_current_advance_step(state)
+    rngs = jax.random.split(rng, self.n_fields)
+    for (name, rf), sample_key in zip(self._random_fields.items(), rngs):
       # rvs is a RandomnessState.
-      rvs = rf.advance(RandomnessState(state.core[name]), rng=sample_key)
+      rvs = rf.advance(
+          RandomnessState(state.core[name], prng_key=sample_key, prng_step=0)
+      )
       core[name] = rvs.core
       nodal_values[name] = rvs.nodal_value
       modal_values[name] = rvs.modal_value
@@ -921,6 +920,8 @@ class DictOfGaussianRandomFieldModules(hk.Module):
         core=core,
         nodal_value=nodal_values,
         modal_value=modal_values,
+        prng_key=state.prng_key,
+        prng_step=state.prng_step + 1,
     )
 
 
@@ -950,36 +951,36 @@ class SumOfRandomFields(RandomField):
       return PreferredRepresentation.MODAL
     return None
 
-  def unconditional_sample(
-      self,
-      rng: typing.PRNGKeyArray,
-  ) -> RandomnessState:
+  def unconditional_sample(self, rng: typing.PRNGKeyArray) -> RandomnessState:
     """Sample the random field unconditionally."""
     rvs = []
-    for rf in self._random_fields:
-      rng, sample_key = jax.random.split(rng)
+    *rngs, next_rng = jax.random.split(rng, len(self._random_fields) + 1)
+    for rf, sample_key in zip(self._random_fields, rngs, strict=True):
       rvs.append(rf.unconditional_sample(sample_key).core)
     return RandomnessState(
         core=rvs,
         nodal_value=self.to_nodal_values(rvs),
         modal_value=self.to_modal_values(rvs),
+        prng_key=next_rng,
+        prng_step=0,
     )
 
-  def advance(
-      self,
-      state: RandomnessState,
-      *,
-      rng: typing.PRNGKeyArray,
-  ) -> RandomnessState:
+  def advance(self, state: RandomnessState) -> RandomnessState:
     """Updates the core state of a random field."""
     rvs = []
-    for rf, s in zip(self._random_fields, state.core, strict=True):
-      rng, sample_key = jax.random.split(rng)
-      rvs.append(rf.advance(RandomnessState(s), rng=sample_key).core)
+    rng = _prng_key_for_current_advance_step(state)
+    rngs = jax.random.split(rng, len(self._random_fields))
+    for rf, s, k in zip(
+        self._random_fields, state.core, rngs, strict=True
+    ):
+      rs = RandomnessState(s, prng_key=k, prng_step=state.prng_step)
+      rvs.append(rf.advance(rs).core)
     return RandomnessState(
         core=rvs,
         nodal_value=self.to_nodal_values(rvs),
         modal_value=self.to_modal_values(rvs),
+        prng_key=state.prng_key,
+        prng_step=state.prng_step + 1,
     )
 
   def to_modal_values(self, core_state: CoreRandomState) -> typing.Array | None:

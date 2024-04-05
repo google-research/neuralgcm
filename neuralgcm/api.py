@@ -13,6 +13,7 @@
 # limitations under the License.
 """Public API for NeuralGCM models."""
 from __future__ import annotations
+
 import datetime
 import functools
 from typing import Any
@@ -75,10 +76,12 @@ def _prepend_dummy_time_axis(state: typing.Pytree) -> typing.Pytree:
 
 def _static_gin_config(method):
   """Decorator to add static gin config to a method."""
+
   @functools.wraps(method)
   def _method(self, *args, **kwargs):
     with gin_utils.specific_config(self.gin_config):
       return method(self, *args, **kwargs)
+
   return _method
 
 
@@ -185,7 +188,7 @@ class PressureLevelModel:
         'geopotential': 'z',
         'temperature': 't',
         'longitude': 'lon',
-        'latitude': 'lat'
+        'latitude': 'lat',
     }
     return xarray_utils.data_to_xarray_with_renaming(
         data,
@@ -198,7 +201,10 @@ class PressureLevelModel:
   @jax.jit
   @_static_gin_config
   def encode(
-      self, inputs: Inputs, forcings: Forcings, rng_key: typing.PRNGKeyArray
+      self,
+      inputs: Inputs,
+      forcings: Forcings,
+      rng_key: typing.PRNGKeyArray | None = None,
   ) -> State:
     """Encode from pressure-level inputs & forcings to model state.
 
@@ -209,7 +215,8 @@ class PressureLevelModel:
         an array with shape `[level, longitude, latitude]` matching
         `data_coords`. Single level data (e.g., sea surface temperature) should
         have a `level` dimension of size 1.
-      rng_key: JAX RNG key to use for encoding the state.
+      rng_key: optional JAX RNG key to use for encoding the state. Required if
+        using stochastic models, otherwise ignored.
 
     Returns:
       Dynamical core state on sigma levels, where all arrays have dimensions
@@ -224,9 +231,7 @@ class PressureLevelModel:
 
   @jax.jit
   @_static_gin_config
-  def advance(
-      self, state: State, forcings: Forcings, rng_key: typing.PRNGKeyArray
-  ) -> State:
+  def advance(self, state: State, forcings: Forcings) -> State:
     """Advance model state one timestep forward.
 
     Args:
@@ -237,7 +242,6 @@ class PressureLevelModel:
         an array with shape `[level, longitude, latitude]` matching
         `data_coords`. Single level data (e.g., sea surface temperature) should
         have a `level` dimension of size 1.
-      rng_key: JAX RNG key to use for advancing the state.
 
     Returns:
       State advanced one time-step forward.
@@ -246,7 +250,7 @@ class PressureLevelModel:
     sim_time = _sim_time_from_state(state)
     forcings = _prepend_dummy_time_axis(forcings)
     f = self._structure.forcing_fn(self.params, None, forcings, sim_time)
-    state = self._structure.advance_fn(self.params, rng_key, state, f)
+    state = self._structure.advance_fn(self.params, None, state, f)
     return state
 
   @jax.jit
@@ -282,7 +286,6 @@ class PressureLevelModel:
       self,
       state: State,
       forcings: Forcings,
-      rng_key: typing.PRNGKeyArray,
       *,
       steps: int,
       timedelta: TimedeltaLike | None = None,
@@ -292,9 +295,7 @@ class PressureLevelModel:
 
     Usage:
 
-      advanced_state, outputs = model.unroll(
-          state, forcings, rng_key, steps=N, post_process_fn=model.decode
-      )
+      advanced_state, outputs = model.unroll(state, forcings, steps=N)
 
     where `advanced_state` is the advanced model state after `N` steps and
     `outputs` is a trajectory of decoded states on pressure-levels with a
@@ -306,13 +307,12 @@ class PressureLevelModel:
         trajectory. Should include a leading time-axis, but times can be at any
         desired granularity compatible with the model (e.g., it should be fine
         to supply daily forcing data, even if producing hourly outputs).
-      rng_key: random key to use for advancing state.
       steps: number of time-steps to take.
       timedelta: size of each time-step to take, which must be a multiple of the
         internal model timestep. By default uses the internal model timestep.
-      start_with_input: if `True`, outputs are at times `[0, ..., (steps
-        - 1) * timestep]` relative to the initial time; if `False`, outputs
-        are at times `[timestep, ..., steps * timestep]`.
+      start_with_input: if `True`, outputs are at times `[0, ..., (steps - 1) *
+        timestep]` relative to the initial time; if `False`, outputs are at
+        times `[timestep, ..., steps * timestep]`.
 
     Returns:
       A tuple of the advanced state at time `steps * timestamp`, and outputs
@@ -340,17 +340,16 @@ class PressureLevelModel:
       )
 
     compute_slice = hk.transform(compute_slice_fwd)
-    return compute_slice.apply(self.params, rng_key, state, forcings)
+    return compute_slice.apply(self.params, None, state, forcings)
 
   @classmethod
   def from_checkpoint(cls, checkpoint: Any) -> PressureLevelModel:
     """Creates a PressureLevelModel from a checkpoint.
 
     Args:
-      checkpoint: dictionary with keys "model_config_str", "aux_ds_dict"
-        and "params" that specifies model gin configuration, supplemental
-        xarray dataset with model-specific static features, and model
-        parameters.
+      checkpoint: dictionary with keys "model_config_str", "aux_ds_dict" and
+        "params" that specifies model gin configuration, supplemental xarray
+        dataset with model-specific static features, and model parameters.
 
     Returns:
       Instance of a `PressureLevelModel` with weights and configuration
@@ -361,7 +360,8 @@ class PressureLevelModel:
       aux_ds = xarray.Dataset.from_dict(checkpoint['aux_ds_dict'])
       data_coords = model_builder.coordinate_system_from_dataset(aux_ds)
       model_specs = model_builder.get_model_specs(
-          data_coords, physics_specs, {xarray_utils.XARRAY_DS_KEY: aux_ds})
+          data_coords, physics_specs, {xarray_utils.XARRAY_DS_KEY: aux_ds}
+      )
       whirl_model = model_builder.WhirlModel(
           coords=model_specs.coords,
           dt=model_specs.dt,
