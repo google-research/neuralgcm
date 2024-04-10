@@ -16,7 +16,7 @@
 A tower is a neural network that operates identically over the last two
 dimensions, i.e. (longitude, latitude).
 """
-
+from collections import abc
 from typing import Callable, Optional, Tuple
 from dinosaur import typing
 import gin
@@ -84,7 +84,7 @@ class VerticalConvTower(hk.Module):
   def __init__(
       self,
       output_size: int,  # The number of channels in the last layer
-      channels: list[int] = gin.REQUIRED,
+      channels: abc.Sequence[int] = gin.REQUIRED,
       kernel_shape: int = gin.REQUIRED,
       with_bias: bool = True,
       activation: Callable[[jnp.ndarray], jnp.ndarray] = jax.nn.relu,
@@ -99,7 +99,7 @@ class VerticalConvTower(hk.Module):
     self.checkpoint_tower = checkpoint_tower
 
     self.layers = []
-    channels.append(self.output_size)
+    channels = list(channels) + [self.output_size]
     for channels_i in channels:
       self.layers.append(layers.ConvLevel(
           output_channels=channels_i,
