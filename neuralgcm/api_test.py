@@ -43,7 +43,27 @@ def horizontal_regrid(
   return regridded
 
 
+def _assert_allclose(actual, desired, *, err_msg=None, range_rtol=1e-5):
+  span = desired.max() - desired.min()
+  np.testing.assert_allclose(
+      actual / span, desired / span, rtol=0, atol=range_rtol, err_msg=err_msg
+  )
+
+
 class APITest(absltest.TestCase):
+
+  def assertDictAllclose(
+      self, actual, desired, *, err_msg=None, range_rtol=1e-5
+  ):
+    self.assertEqual(actual.keys(), desired.keys())
+    for key in actual:
+      x = actual[key]
+      y = desired[key]
+      err_msg2 = key if err_msg is None else f'{err_msg}/{key}'
+      if isinstance(y, dict):
+        self.assertDictAllclose(x, y, err_msg=err_msg2, range_rtol=range_rtol)
+      else:
+        _assert_allclose(x, y, err_msg=err_msg2, range_rtol=range_rtol)
 
   def test_stochastic_model_basics(self):
     timesteps = 3
@@ -88,20 +108,30 @@ class APITest(absltest.TestCase):
     # check that round-tripping the initial condition is approximately correct
     typical_relative_error = abs(actual - expected).median() / expected.std()
     tolerance = xarray.Dataset({
-        "u_component_of_wind": 0.04,
-        "v_component_of_wind": 0.08,
-        "temperature": 0.02,
-        "geopotential": 0.0005,
-        "specific_humidity": 0.003,
-        "specific_cloud_liquid_water_content": 0.12,
-        "specific_cloud_ice_water_content": 0.15,
+        'u_component_of_wind': 0.04,
+        'v_component_of_wind': 0.08,
+        'temperature': 0.02,
+        'geopotential': 0.0005,
+        'specific_humidity': 0.003,
+        'specific_cloud_liquid_water_content': 0.12,
+        'specific_cloud_ice_water_content': 0.15,
     })
     self.assertTrue(
         (typical_relative_error < tolerance).to_array().values.all(),
-        msg=f"typical relative error is too large:\n{typical_relative_error}",
+        msg=f'typical relative error is too large:\n{typical_relative_error}',
     )
 
-    # TODO(shoyer): test decode()
+    # test decode()
+    decoded = model.decode(encoded, forcings_in)
+    expected = jax.tree.map(lambda x: x[0, ...], data_out)
+    self.assertDictAllclose(decoded, expected)
+
+    # test advance()
+    self.assertEqual(model.timestep, dt)
+    decoded2 = model.decode(model.advance(encoded, forcings_in), forcings_in)
+    expected2 = jax.tree.map(lambda x: x[1, ...], data_out)
+    self.assertDictAllclose(decoded2, expected2)
+
     # TODO(shoyer): verify RNG key works correctly
     # TODO(shoyer): verify RNG key is optional for deterministic models
 
