@@ -71,6 +71,9 @@ class ModalToNodalEmbedding(hk.Module):
   ) -> typing.Pytree:
     """Returns the embedding output on nodal locations."""
     net = self.nodal_mapping_module(self.output_shapes)
+    # Need to check if dict when embedding is not within the parameterization
+    # (e.g., for diagnostic NN)
+    state, _ = pytree_utils.as_dict(state)
     nodal_inputs = self.modal_to_nodal_features_fn(
         state, memory, diagnostics, randomness, forcing
     )

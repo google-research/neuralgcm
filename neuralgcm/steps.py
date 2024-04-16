@@ -267,7 +267,7 @@ class StochasticPhysicsParameterizationStep(BaseStep, hk.Module):
     pp_tendency = self.physics_parameterization_fn(
         x.state, x.memory, x.diagnostics, x.randomness.nodal_value, forcing
     )
-    x.diagnostics = self.diagnostics_fn(x, pp_tendency)
+    x.diagnostics = self.diagnostics_fn(x, pp_tendency, forcing)
     return x
 
   def __call__(
@@ -294,7 +294,7 @@ class StochasticPhysicsParameterizationStep(BaseStep, hk.Module):
       # TODO(dkochkov) update stochastic modules to take optional state.
       next_randomness = self.randomness_fn.advance(x.randomness)
       next_memory = x.state if x.memory is not None else None
-      next_diagnostics = self.diagnostics_fn(x, pp_tendency)
+      next_diagnostics = self.diagnostics_fn(x, pp_tendency, forcing)
       x_next = ModelState(
           state=next_state, memory=next_memory, diagnostics=next_diagnostics,
           randomness=next_randomness)
