@@ -97,6 +97,7 @@ class ForcingsTest(parameterized.TestCase):
     def forcing_fwd(forcing_data, sim_time):
       forcing_fn = forcings.DynamicDataForcing(
           self.coords, self.dt, self.physics_specs, self.aux_features,
+          check_sim_time_errors=True,
           inputs_to_units_mapping=inputs_to_units_mapping)
       return forcing_fn(forcing_data, sim_time)
 
@@ -188,6 +189,7 @@ class ForcingsTest(parameterized.TestCase):
       def forcing_fwd_vmap(forcing_data, sim_time):
         forcing_fn = forcings.DynamicDataForcing(
             self.coords, self.dt, self.physics_specs, self.aux_features,
+            check_sim_time_errors=True,
             inputs_to_units_mapping=inputs_to_units_mapping)
         forcing_fn = jax.vmap(forcing_fn, in_axes=(None, 0))
         return forcing_fn(forcing_data, sim_time)

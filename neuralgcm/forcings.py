@@ -97,6 +97,9 @@ class DynamicDataForcing(hk.Module):
       time_axis: int = 0,
       data_time_step: float | QuantityOrStr | None = None,
       dt_tolerance: Union[float, QuantityOrStr] = '1 hour',
+      # TODO(langmore) Remove checking once bug arising from http://cl/624039690
+      # is fixed.
+      check_sim_time_errors: bool = False,
       name: Optional[str] = None,
   ):
     # TODO(shoyer): remove data_time_step entirely, once we're sure that no
@@ -120,6 +123,7 @@ class DynamicDataForcing(hk.Module):
           scales.Quantity(dt_tolerance)
       )
     self.dt_tolerance = dt_tolerance
+    self._check_sim_time_errors = check_sim_time_errors
 
   def __call__(
       self,
@@ -153,13 +157,14 @@ class DynamicDataForcing(hk.Module):
 
     # Also add errors (if any) to _FORCING_ERRORS so _check_errors can be called
     # to raise.
-    jax.experimental.io_callback(
-        _check_sim_time_close_to_forcing_sim_time,
-        None,  # Returns None
-        sim_time=sim_time,
-        forcing_sim_time=forcing['sim_time'],
-        tolerance=self.dt_tolerance,
-    )
+    if self._check_sim_time_errors:
+      jax.experimental.io_callback(
+          _check_sim_time_close_to_forcing_sim_time,
+          None,  # Returns None
+          sim_time=sim_time,
+          forcing_sim_time=forcing['sim_time'],
+          tolerance=self.dt_tolerance,
+      )
     return self.forcing_transform_fn(forcing)
 
 
