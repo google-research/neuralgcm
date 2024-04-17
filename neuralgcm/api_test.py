@@ -50,12 +50,42 @@ def _assert_allclose(actual, desired, *, err_msg=None, range_rtol=1e-5):
   )
 
 
+def load_tl63_stochastic_model() -> api.PressureLevelModel:
+  package = importlib.resources.files(neuralgcm)
+  file = package.joinpath('data/tl63_stochastic_mini.pkl')
+  ckpt = pickle.loads(file.read_bytes())
+  return api.PressureLevelModel.from_checkpoint(ckpt)
+
+
+def load_tl63_data() -> xarray.Dataset:
+  package = importlib.resources.files(neuralgcm)
+  with package.joinpath('data/era5_tl31_19590102T00.nc').open('rb') as f:
+    ds = xarray.load_dataset(f).expand_dims('time')
+  regridder = horizontal_interpolation.ConservativeRegridder(
+      spherical_harmonic.Grid.TL31(), spherical_harmonic.Grid.TL63()
+  )
+  return horizontal_regrid(regridder, ds)
+
+
 class APITest(absltest.TestCase):
+
+  def assertDictEqual(
+      self, actual, desired, *, err_msg=None
+  ):
+    self.assertEqual(sorted(actual.keys()), sorted(desired.keys()))
+    for key in actual:
+      x = actual[key]
+      y = desired[key]
+      err_msg2 = key if err_msg is None else f'{err_msg}/{key}'
+      if isinstance(y, dict):
+        self.assertDictAllclose(x, y, err_msg=err_msg2)
+      else:
+        np.testing.assert_array_equal(x, y, err_msg=err_msg2)
 
   def assertDictAllclose(
       self, actual, desired, *, err_msg=None, range_rtol=1e-5
   ):
-    self.assertEqual(actual.keys(), desired.keys())
+    self.assertEqual(sorted(actual.keys()), sorted(desired.keys()))
     for key in actual:
       x = actual[key]
       y = desired[key]
@@ -65,23 +95,41 @@ class APITest(absltest.TestCase):
       else:
         _assert_allclose(x, y, err_msg=err_msg2, range_rtol=range_rtol)
 
+  def test_from_xarray(self):
+    model = load_tl63_stochastic_model()
+    ds = load_tl63_data()
+
+    state_variables = [
+        'u_component_of_wind',
+        'v_component_of_wind',
+        'geopotential',
+        'temperature',
+        'specific_humidity',
+        'specific_cloud_liquid_water_content',
+        'specific_cloud_ice_water_content',
+    ]
+    forcing_variables = ['sea_surface_temperature', 'sea_ice_cover']
+
+    expected_data = {k: ds[k].values for k in state_variables}
+    expected_data['sim_time'] = np.array([-92034.607104])
+
+    expected_forcings = {k: ds[k].values for k in forcing_variables}
+    expected_forcings['sim_time'] = np.array([-92034.607104])
+
+    data, forcings = model.data_from_xarray(ds)
+    self.assertDictEqual(data, expected_data)
+    self.assertDictEqual(forcings, expected_forcings)
+
+    forcings2 = model.forcings_from_xarray(ds)
+    self.assertDictEqual(forcings2, expected_forcings)
+
   def test_stochastic_model_basics(self):
     timesteps = 3
     dt = np.timedelta64(1, 'h')
 
-    # load model
-    package = importlib.resources.files(neuralgcm)
-    file = package.joinpath('data/tl63_stochastic_mini.pkl')
-    ckpt = pickle.loads(file.read_bytes())
-    model = api.PressureLevelModel.from_checkpoint(ckpt)
+    model = load_tl63_stochastic_model()
+    ds_in = load_tl63_data()
 
-    # load data
-    with package.joinpath('data/era5_tl31_19590102T00.nc').open('rb') as f:
-      ds_tl31 = xarray.load_dataset(f).expand_dims('time')
-    regridder = horizontal_interpolation.ConservativeRegridder(
-        spherical_harmonic.Grid.TL31(), model.data_coords.horizontal
-    )
-    ds_in = horizontal_regrid(regridder, ds_tl31)
     data, forcings = model.data_from_xarray(ds_in)
     data_in, forcings_in = pytree_utils.slice_along_axis(
         (data, forcings), axis=0, idx=0
@@ -94,7 +142,7 @@ class APITest(absltest.TestCase):
     )
 
     # convert to xarray
-    t0 = ds_tl31.time.values[0]
+    t0 = ds_in.time.values[0]
     times = np.arange(t0, t0 + timesteps * dt, dt)
     ds_out = model.data_to_xarray(data_out, times=times)
 

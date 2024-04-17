@@ -85,6 +85,25 @@ def _static_gin_config(method):
   return _method
 
 
+_ABBREVIATED_NAMES = {
+    'u_component_of_wind': 'u',
+    'v_component_of_wind': 'v',
+    'geopotential': 'z',
+    'temperature': 't',
+    'longitude': 'lon',
+    'latitude': 'lat',
+}
+_FULL_NAMES = {v: k for k, v in _ABBREVIATED_NAMES.items()}
+
+
+def _expand_tracers(inputs: dict) -> dict:
+  inputs = inputs.copy()
+  inputs.update(inputs.pop('tracers'))
+  assert not inputs['diagnostics']
+  del inputs['diagnostics']
+  return inputs
+
+
 @tree_util.register_pytree_node_class
 class PressureLevelModel:
   """Inference-only API for models that predict dense data on pressure levels.
@@ -105,6 +124,12 @@ class PressureLevelModel:
     self._structure = structure
     self._params = params
     self.gin_config = gin_config
+    self._tracer_variables = [
+        'specific_humidity',
+        'specific_cloud_liquid_water_content',
+        'specific_cloud_ice_water_content',
+    ]
+    self._forcing_variables = ['sea_ice_cover', 'sea_surface_temperature']
 
   def __repr__(self):
     return (
@@ -144,37 +169,70 @@ class PressureLevelModel:
     """Coordinate system for internal model state."""
     return self._structure.coords
 
-  @_static_gin_config
-  def data_from_xarray(
-      self, dataset: xarray.Dataset
-  ) -> tuple[Inputs, Forcings]:
-    """Extracts data and forcings from xarray.Dataset."""
+  def _check_coords(self, dataset: xarray.Dataset):
+    """Checks that dataset has the same coords as the model."""
+    dataset_coords = model_builder.coordinate_system_from_dataset(dataset)
+
+    if not np.allclose(
+        actual := dataset_coords.horizontal.longitudes,
+        desired := self.data_coords.horizontal.longitudes,
+        atol=1e-3,
+    ):
+      raise ValueError(f'longitude coordinate mismatch: {actual=}, {desired=}')
+
+    if not np.allclose(
+        actual := dataset_coords.horizontal.latitudes,
+        desired := self.data_coords.horizontal.latitudes,
+        atol=1e-3,
+    ):
+      raise ValueError(f'latitude coordinate mismatch: {actual=}, {desired=}')
+
+    if dataset_coords.vertical is not None and not np.allclose(
+        actual := dataset_coords.vertical.centers,
+        desired := self.data_coords.vertical.centers,
+        atol=1e-3,
+    ):
+      raise ValueError(
+          f'pressure level coordinate mismatch: {actual=}, {desired=}'
+      )
+
+  def _dataset_with_sim_time(self, dataset: xarray.Dataset) -> xarray.Dataset:
     ref_datetime = self._structure.specs.aux_features['reference_datetime']
-    dataset = xarray_utils.ds_with_sim_time(
+    return xarray_utils.ds_with_sim_time(
         dataset,
         self._structure.specs.physics_specs,
         reference_datetime=ref_datetime,
     )
-    dataset_coords = model_builder.coordinate_system_from_dataset(dataset)
-    if not np.allclose(
-        dataset_coords.horizontal.longitudes,
-        self.data_coords.horizontal.longitudes,
-        atol=1e-3,
-    ):
-      raise ValueError('longitude coordinate mismatch')
-    if not np.allclose(
-        dataset_coords.horizontal.latitudes,
-        self.data_coords.horizontal.latitudes,
-        atol=1e-3,
-    ):
-      raise ValueError('latitude coordinate mismatch')
-    if not np.allclose(
-        dataset_coords.vertical.centers,
-        self.data_coords.vertical.centers,
-        atol=1e-3,
-    ):
-      raise ValueError('pressure level coordinate mismatch')
-    return self._structure.from_xarray_fn(dataset)
+
+  def _to_abbreviated_names_and_tracers(self, inputs: dict) -> dict:
+    inputs = {_ABBREVIATED_NAMES.get(k, k): v for k, v in inputs.items()}
+    inputs['tracers'] = {k: inputs.pop(k) for k in self._tracer_variables}
+    inputs['diagnostics'] = {}
+    return inputs
+
+  def _from_abbreviated_names_and_tracers(self, outputs: dict) -> dict:
+    outputs = {_FULL_NAMES.get(k, k): v for k, v in outputs.items()}
+    outputs |= outputs.pop('tracers')
+    outputs |= outputs.pop('diagnostics')
+    return outputs
+
+  @_static_gin_config
+  def data_from_xarray(
+      self, dataset: xarray.Dataset
+  ) -> tuple[Inputs, Forcings]:
+    """Extracts data and forcings from an xarray.Dataset."""
+    dataset = self._dataset_with_sim_time(dataset)
+    self._check_coords(dataset)
+    inputs, forcings = self._structure.from_xarray_fn(dataset)
+    inputs = self._from_abbreviated_names_and_tracers(inputs)
+    return inputs, forcings
+
+  def forcings_from_xarray(self, dataset: xarray.Dataset) -> Forcings:
+    """Extract forcings only from an xarray.Dataset."""
+    self._check_coords(dataset)
+    return xarray_utils.xarray_to_dynamic_covariate_data(
+        dataset, covariates_to_include=self._forcing_variables
+    )
 
   def data_to_xarray(
       self,
@@ -182,18 +240,11 @@ class PressureLevelModel:
       times: np.ndarray | None,
   ) -> xarray.Dataset:
     """Converts decoded model predictions to xarray.Dataset format."""
-    default_to_internal_names_dict = {
-        'u_component_of_wind': 'u',
-        'v_component_of_wind': 'v',
-        'geopotential': 'z',
-        'temperature': 't',
-        'longitude': 'lon',
-        'latitude': 'lat',
-    }
+    data = self._to_abbreviated_names_and_tracers(data)
     return xarray_utils.data_to_xarray_with_renaming(
         data,
         to_xarray_fn=xarray_utils.data_to_xarray,
-        renaming_dict=default_to_internal_names_dict,
+        renaming_dict=_ABBREVIATED_NAMES,
         coords=self.data_coords,
         times=times,
     )
@@ -225,6 +276,7 @@ class PressureLevelModel:
     # TODO(langmore): refactor into an API that explicitly takes input random
     # noise rather than an RNG key.
     sim_time = inputs['sim_time']
+    inputs = self._to_abbreviated_names_and_tracers(inputs)
     inputs, forcings = _prepend_dummy_time_axis((inputs, forcings))
     f = self._structure.forcing_fn(self.params, None, forcings, sim_time)
     return self._structure.encode_fn(self.params, rng_key, inputs, f)
@@ -275,7 +327,9 @@ class PressureLevelModel:
     sim_time = _sim_time_from_state(state)
     forcings = _prepend_dummy_time_axis(forcings)
     f = self._structure.forcing_fn(self.params, None, forcings, sim_time)
-    return self._structure.decode_fn(self.params, None, state, f)
+    outputs = self._structure.decode_fn(self.params, None, state, f)
+    outputs = self._from_abbreviated_names_and_tracers(outputs)
+    return outputs
 
   @functools.partial(
       jax.jit,
@@ -340,7 +394,10 @@ class PressureLevelModel:
       )
 
     compute_slice = hk.transform(compute_slice_fwd)
-    return compute_slice.apply(self.params, None, state, forcings)
+    state, outputs = compute_slice.apply(self.params, None, state, forcings)
+    outputs = {_FULL_NAMES.get(k, k): v for k, v in outputs.items()}
+    outputs = _expand_tracers(outputs)
+    return state, outputs
 
   @classmethod
   def from_checkpoint(cls, checkpoint: Any) -> PressureLevelModel:
