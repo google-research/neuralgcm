@@ -14,7 +14,7 @@
 """Defines `diagnostic` modules that compute diagnostic predictions."""
 
 from collections import abc
-from typing import Any, Callable, Protocol
+from typing import Any, Callable, Optional, Protocol
 
 from dinosaur import coordinate_systems
 from dinosaur import scales
@@ -22,8 +22,13 @@ from dinosaur import sigma_coordinates
 from dinosaur import typing
 
 import gin
+import haiku as hk
 import jax
 import jax.numpy as jnp
+import numpy as np
+
+
+TransformModule = typing.TransformModule
 
 
 class DiagnosticFn(Protocol):
@@ -122,7 +127,11 @@ class PrecipitationMinusEvaporationDiagnostics:
       dt: float,
       physics_specs: Any,
       aux_features: dict[str, Any],
-      moisture_species: tuple[str, ...] = ('specific_humidity',),
+      moisture_species: tuple[str, ...] = (
+          'specific_humidity',
+          'specific_cloud_ice_water_content',
+          'specific_cloud_liquid_water_content',
+      ),
       method: str = 'rate',
   ):
     del aux_features
@@ -133,14 +142,10 @@ class PrecipitationMinusEvaporationDiagnostics:
     self.method = method
     self.to_nodal_fn = coords.horizontal.to_nodal
 
-  def __call__(
-      self,
-      model_state: typing.ModelState,
-      physics_tendencies: typing.Pytree,
-      forcing: typing.Forcing | None = None,
-  ) -> typing.Pytree:
-    """Computes precipitation minus evaporation."""
-    del forcing  # unused
+  def _compute_evaporation_minus_precipitation(
+      self, model_state: typing.ModelState, physics_tendencies: typing.Pytree
+  ) -> typing.Array:
+    """Computes evaporation minus precipitation."""
     lsp = model_state.state.log_surface_pressure
     p_surface = jnp.squeeze(jnp.exp(self.to_nodal_fn(lsp)), axis=0)
     moisture_tendencies = [
@@ -152,6 +157,19 @@ class PrecipitationMinusEvaporationDiagnostics:
     scale = p_surface / self.physics_specs.g
     e_minus_p = scale * sigma_coordinates.sigma_integral(
         moisture_tendencies, self.coords.vertical, keepdims=False
+    )
+    return e_minus_p
+
+  def __call__(
+      self,
+      model_state: typing.ModelState,
+      physics_tendencies: typing.Pytree,
+      forcing: typing.Forcing | None = None,
+  ) -> typing.Pytree:
+    """Computes precipitation minus evaporation."""
+    del forcing  # unused
+    e_minus_p = self._compute_evaporation_minus_precipitation(
+        model_state, physics_tendencies
     )
     if self.method == 'rate':
       return {'P_minus_E_rate': -e_minus_p}
@@ -176,7 +194,11 @@ class PrecipitableWaterDiagnostics:
       dt: float,
       physics_specs: Any,
       aux_features: dict[str, Any],
-      moisture_species: tuple[str, ...] = ('specific_humidity',),
+      moisture_species: tuple[str, ...] = (
+          'specific_humidity',
+          'specific_cloud_ice_water_content',
+          'specific_cloud_liquid_water_content',
+      ),
   ):
     del dt, aux_features
     self.coords = coords
@@ -232,5 +254,115 @@ class NodalModelDiagnosticsDecoder:
     """Computes precipitation minus evaporation."""
     del physics_tendencies, forcing  # unused.
     nodal_diagnostics = coordinate_systems.maybe_to_nodal(
-        model_state.diagnostics, self.coords)
+        model_state.diagnostics, self.coords
+    )
     return nodal_diagnostics
+
+
+# TODO(janniyuval) add a decoder that can add some Gaussian noise to evap/precip
+@gin.register
+class EvaporationPrecipitationDiagnostics(
+    hk.Module, PrecipitationMinusEvaporationDiagnostics
+):
+  """Predict evaporation and computes cumulative precipitation.
+
+  Calculation is based on calculating `P-E` by integrating physics_tendencies.
+  Depending on the `method` computes either precipitation
+  rate, (which in ERA5 has units `kg m**-2 s**-1`) or time-accumulated value
+  in `Length` units (GPCP uses mm/day) if `method == cumulative`.
+  Evaporation has the units of `kg m**-2 s**-1` in ERA5.
+  """
+
+  def __init__(
+      self,
+      coords: coordinate_systems.CoordinateSystem,
+      dt: float,
+      physics_specs: Any,
+      aux_features: dict[str, Any],
+      embedding_module: typing.EmbeddingModule,
+      moisture_species: tuple[str, ...] = (
+          'specific_humidity',
+          'specific_cloud_ice_water_content',
+          'specific_cloud_liquid_water_content',
+      ),
+      feature_name: str = 'evaporation',
+      method_precipitation: str = 'cumulative',
+      method_evaporation: str = 'rate',
+      name: Optional[str] = None,
+  ):
+    # del aux_features
+    super().__init__(name=name)
+    self.coords = coords
+    self.dt = dt
+    self.physics_specs = physics_specs
+    self.moisture_species = moisture_species
+    self.method_precipitation = method_precipitation
+    self.method_evaporation = method_evaporation
+    self.to_nodal_fn = coords.horizontal.to_nodal
+
+    output_shapes = {f'{feature_name}': np.asarray(coords.surface_nodal_shape)}
+
+    self.embedding_fn = embedding_module(
+        coords, dt, physics_specs, aux_features, output_shapes=output_shapes
+    )
+    self.water_density = self.physics_specs.nondimensionalize(
+        scales.WATER_DENSITY
+    )
+
+  def __call__(
+      self,
+      model_state: typing.ModelState,
+      physics_tendencies: typing.Pytree,
+      forcing: typing.Forcing | None = None,
+  ) -> typing.Pytree:
+    """Computes precipitation minus evaporation."""
+    e_minus_p = self._compute_evaporation_minus_precipitation(
+        model_state, physics_tendencies
+    )
+    evaporation = self.embedding_fn(
+        model_state.state,
+        model_state.memory,
+        model_state.diagnostics,
+        model_state.randomness,
+        forcing,
+    )
+
+    # Note: In ERA5 mean_evaporation_rate (kg m**-2 s**-1)
+    # is negative for evaporation.
+    # In GPCP precipitation is positive (mm/day).
+    # Here e_minus_p is positive for evaporation.
+    output_dict = {}
+    surface_nodal_shape = self.coords.horizontal.nodal_shape
+    if self.method_precipitation == 'rate':  # units: length/time
+      output_dict['precipitation_rate'] = (
+          (-e_minus_p - evaporation['evaporation']) / self.water_density
+      )
+    elif self.method_precipitation == 'cumulative':  # units: length
+      previous = model_state.diagnostics.get(
+          'precipitation_cumulative', jnp.zeros(surface_nodal_shape)
+      )
+      output_dict['precipitation_cumulative'] = previous - (
+          ((e_minus_p + evaporation['evaporation']) / self.water_density)
+          * self.dt
+      )
+    else:
+      raise ValueError(
+          f'Precipitation method is {self.method_precipitation=}, but it must'
+          ' be `rate`/`cumulative`'
+      )
+    if self.method_evaporation == 'rate':  # units: mass length**-2 time**-1
+      output_dict['evaporation'] = evaporation['evaporation']
+    elif self.method_evaporation == 'cumulative':  # units: length
+      previous_evap = model_state.diagnostics.get(
+          'evaporation_cumulative', jnp.zeros(surface_nodal_shape)
+      )
+      output_dict['evaporation_cumulative'] = (
+          previous_evap
+          + (evaporation['evaporation'] / self.water_density) * self.dt
+      )
+    else:
+      raise ValueError(
+          f'Evaporation method is {self.method_evaporation=},  but it must be'
+          ' `rate`/`cumulative`'
+      )
+    return output_dict
