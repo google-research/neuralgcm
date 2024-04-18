@@ -69,9 +69,7 @@ def load_tl63_data() -> xarray.Dataset:
 
 class APITest(absltest.TestCase):
 
-  def assertDictEqual(
-      self, actual, desired, *, err_msg=None
-  ):
+  def assertDictEqual(self, actual, desired, *, err_msg=None):
     self.assertEqual(sorted(actual.keys()), sorted(desired.keys()))
     for key in actual:
       x = actual[key]
@@ -94,6 +92,26 @@ class APITest(absltest.TestCase):
         self.assertDictAllclose(x, y, err_msg=err_msg2, range_rtol=range_rtol)
       else:
         _assert_allclose(x, y, err_msg=err_msg2, range_rtol=range_rtol)
+
+  def test_to_and_from_nondim_units(self):
+    model = load_tl63_stochastic_model()
+
+    nondim = model.to_nondim_units(1.0, 'meters')
+    self.assertAlmostEqual(nondim, 1 / 6.37122e6)  # Earth radius units
+
+    roundtripped = model.from_nondim_units(nondim, 'meters')
+    self.assertAlmostEqual(roundtripped, 1.0)
+
+  def test_sim_time_utilities(self):
+    model = load_tl63_stochastic_model()
+    origin = model.datetime64_to_sim_time(np.datetime64('1979-01-01T00:00:00'))
+    self.assertEqual(origin, 0.0)
+
+    original = np.datetime64('1959-01-01T00:00:00')
+    roundtripped = model.sim_time_to_datetime64(
+        model.datetime64_to_sim_time(original)
+    )
+    self.assertEqual(original, roundtripped)
 
   def test_from_xarray(self):
     model = load_tl63_stochastic_model()

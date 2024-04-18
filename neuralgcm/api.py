@@ -19,6 +19,7 @@ import functools
 from typing import Any
 
 from dinosaur import coordinate_systems
+from dinosaur import scales
 from dinosaur import typing
 from dinosaur import xarray_utils
 import haiku as hk
@@ -43,6 +44,7 @@ BatchedOutputs = Any
 State = Any
 
 TimedeltaLike = str | np.timedelta64 | pd.Timestamp | datetime.timedelta
+Numeric = float | np.ndarray | jax.Array | xarray.DataArray
 
 
 def _sim_time_from_state(state: State) -> jax.Array:
@@ -215,6 +217,36 @@ class PressureLevelModel:
     outputs |= outputs.pop('tracers')
     outputs |= outputs.pop('diagnostics')
     return outputs
+
+  def to_nondim_units(self, value: Numeric, units: str) -> Numeric:
+    """Scale a value to the model's internal non-dimensional units."""
+    scale_ = self._structure.specs.physics_specs.scale
+    units_ = scales.parse_units(units)
+    return scale_.nondimensionalize(value * units_)
+
+  def from_nondim_units(self, value: Numeric, units: str) -> Numeric:
+    """Scale a value from the model's internal non-dimensional units."""
+    scale_ = self._structure.specs.physics_specs.scale
+    units_ = scales.parse_units(units)
+    return scale_.dimensionalize(value, units_).magnitude
+
+  def datetime64_to_sim_time(self, datetime64: np.ndarray) -> np.ndarray:
+    """Converts a datetime64 array to sim_time."""
+    ref_datetime = self._structure.specs.aux_features['reference_datetime']
+    return xarray_utils.datetime64_to_nondim_time(
+        datetime64,
+        self._structure.specs.physics_specs,
+        reference_datetime=ref_datetime,
+    )
+
+  def sim_time_to_datetime64(self, sim_time: np.ndarray) -> np.ndarray:
+    """Converts a sim_time array to datetime64."""
+    ref_datetime = self._structure.specs.aux_features['reference_datetime']
+    return xarray_utils.nondim_time_to_datetime64(
+        sim_time,
+        self._structure.specs.physics_specs,
+        reference_datetime=ref_datetime,
+    )
 
   @_static_gin_config
   def data_from_xarray(
@@ -430,8 +462,3 @@ class PressureLevelModel:
       return cls(
           whirl_model, checkpoint['params'], checkpoint['model_config_str']
       )
-
-
-# TODO(shoyer): consider adding separate subclasses for deterministic and
-# stochastic models?
-#
