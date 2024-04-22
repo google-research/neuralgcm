@@ -208,7 +208,10 @@ class PressureLevelModel:
 
   def _to_abbreviated_names_and_tracers(self, inputs: dict) -> dict:
     inputs = {_ABBREVIATED_NAMES.get(k, k): v for k, v in inputs.items()}
-    inputs['tracers'] = {k: inputs.pop(k) for k in self._tracer_variables}
+    inputs['tracers'] = {
+        k: inputs.pop(k) for k in self._tracer_variables
+        if k in inputs
+    }
     inputs['diagnostics'] = {}
     return inputs
 
