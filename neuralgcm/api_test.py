@@ -166,7 +166,11 @@ class APITest(absltest.TestCase):
 
     # validate
     actual = ds_out.head(time=1)
-    expected = ds_in.drop_vars(['sea_surface_temperature', 'sea_ice_cover'])
+
+    sim_time = model.datetime64_to_sim_time(ds_in.time.data)
+    expected = ds_in.drop_vars(
+        ['sea_surface_temperature', 'sea_ice_cover']
+    ).assign(sim_time=('time', sim_time))
 
     # check matching variable shapes
     xarray.testing.assert_allclose(actual, expected, atol=1e6)
