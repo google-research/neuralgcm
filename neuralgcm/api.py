@@ -16,11 +16,12 @@ from __future__ import annotations
 
 import datetime
 import functools
-from typing import Any
+from typing import Any, Callable
 
 from dinosaur import coordinate_systems
 from dinosaur import scales
 from dinosaur import typing
+from dinosaur import time_integration
 from dinosaur import xarray_utils
 import haiku as hk
 import jax
@@ -368,7 +369,12 @@ class PressureLevelModel:
 
   @functools.partial(
       jax.jit,
-      static_argnames=['steps', 'timedelta', 'start_with_input'],
+      static_argnames=[
+          'steps',
+          'timedelta',
+          'start_with_input',
+          'post_process_fn',
+      ],
   )
   @_static_gin_config
   def unroll(
@@ -379,6 +385,7 @@ class PressureLevelModel:
       steps: int,
       timedelta: TimedeltaLike | None = None,
       start_with_input: bool = False,
+      post_process_fn: Callable[[State], Any] | None = None,
   ) -> tuple[State, BatchedOutputs]:
     """Unroll predictions over many time-steps.
 
@@ -402,6 +409,8 @@ class PressureLevelModel:
       start_with_input: if `True`, outputs are at times `[0, ..., (steps - 1) *
         timestep]` relative to the initial time; if `False`, outputs are at
         times `[timestep, ..., steps * timestep]`.
+      post_process_fn: optional function to apply to each advanced state to
+        create outputs. By default, uses `lambda x: model.decode(x, forcings)`.
 
     Returns:
       A tuple of the advanced state at time `steps * timestamp`, and outputs
@@ -411,27 +420,18 @@ class PressureLevelModel:
     if timedelta is None:
       timedelta = self.timestep
 
+    if post_process_fn is None:
+      post_process_fn = functools.partial(self.decode, forcings=forcings)
+
     inner_steps = _calculate_sub_steps(self.timestep, timedelta)
-
-    def compute_slice_fwd(state, forcings):
-      model = self._structure.model_cls()
-      # TODO(shoyer): reimplement via encode/advance/decode, in order to
-      # guarantee consistency and allow for more flexible decoding. This would
-      # be easiest after moving rng_key into state.
-      trajectory_fn = model_utils.decoded_trajectory_with_forcing(
-          model, start_with_input=start_with_input
-      )
-      return trajectory_fn(
-          state,
-          forcing_data=forcings,
-          outer_steps=steps,
-          inner_steps=inner_steps,
-      )
-
-    compute_slice = hk.transform(compute_slice_fwd)
-    state, outputs = compute_slice.apply(self.params, None, state, forcings)
-    outputs = {_FULL_NAMES.get(k, k): v for k, v in outputs.items()}
-    outputs = _expand_tracers(outputs)
+    trajectory_func = time_integration.trajectory_from_step(
+        functools.partial(self.advance, forcings=forcings),
+        outer_steps=steps,
+        inner_steps=inner_steps,
+        start_with_input=start_with_input,
+        post_process_fn=post_process_fn,
+    )
+    state, outputs = trajectory_func(state)
     return state, outputs
 
   @classmethod

@@ -19,7 +19,7 @@ import threading
 import gin
 
 
-_GIN_LOCK = threading.Lock()
+_GIN_LOCK = threading.RLock()
 
 
 def _remove_unknown_reference(gin_config_str: str) -> str:
