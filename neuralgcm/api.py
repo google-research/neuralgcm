@@ -265,6 +265,7 @@ class PressureLevelModel:
 
   def forcings_from_xarray(self, dataset: xarray.Dataset) -> Forcings:
     """Extract forcings only from an xarray.Dataset."""
+    dataset = self._dataset_with_sim_time(dataset)
     self._check_coords(dataset)
     return xarray_utils.xarray_to_dynamic_covariate_data(
         dataset, covariates_to_include=self._forcing_variables
