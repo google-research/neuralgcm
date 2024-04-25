@@ -128,18 +128,23 @@ class APITest(absltest.TestCase):
     ]
     forcing_variables = ['sea_surface_temperature', 'sea_ice_cover']
 
-    expected_data = {k: ds[k].values for k in state_variables}
-    expected_data['sim_time'] = np.array([-92034.607104])
+    expected_inputs = {k: ds[k].values for k in state_variables}
+    expected_inputs['sim_time'] = np.array([-92034.607104])
 
-    expected_forcings = {k: ds[k].values for k in forcing_variables}
+    expected_forcings = {
+        k: ds[k].values[:, np.newaxis, :, :] for k in forcing_variables
+    }
     expected_forcings['sim_time'] = np.array([-92034.607104])
 
-    data, forcings = model.data_from_xarray(ds)
-    self.assertDictEqual(data, expected_data)
+    inputs = model.inputs_from_xarray(ds)
+    self.assertDictEqual(inputs, expected_inputs)
+
+    forcings = model.forcings_from_xarray(ds)
     self.assertDictEqual(forcings, expected_forcings)
 
-    forcings2 = model.forcings_from_xarray(ds)
-    self.assertDictEqual(forcings2, expected_forcings)
+    inputs, forcings = model.data_from_xarray(ds)
+    self.assertDictEqual(inputs, expected_inputs)
+    self.assertDictEqual(forcings, expected_forcings)
 
   def test_stochastic_model_basics(self):
     timesteps = 3
@@ -148,15 +153,17 @@ class APITest(absltest.TestCase):
     model = load_tl63_stochastic_model()
     ds_in = load_tl63_data()
 
-    data, forcings = model.data_from_xarray(ds_in)
-    data_in, forcings_in = pytree_utils.slice_along_axis(
-        (data, forcings), axis=0, idx=0
-    )
+    data_in, forcings_in = model.data_from_xarray(ds_in.isel(time=0))
+    persistence_forcings = model.forcings_from_xarray(ds_in.head(time=1))
 
     # run model
     encoded = model.encode(data_in, forcings_in, rng_key=jax.random.key(0))
     _, data_out = model.unroll(
-        encoded, forcings, steps=timesteps, timedelta=dt, start_with_input=True
+        encoded,
+        persistence_forcings,
+        steps=timesteps,
+        timedelta=dt,
+        start_with_input=True,
     )
 
     # convert to xarray
@@ -164,7 +171,7 @@ class APITest(absltest.TestCase):
     times = np.arange(t0, t0 + timesteps * dt, dt)
     ds_out = model.data_to_xarray(data_out, times=times)
 
-    # validate
+    # validate decoded data
     actual = ds_out.head(time=1)
 
     sim_time = model.datetime64_to_sim_time(ds_in.time.data)
@@ -205,6 +212,40 @@ class APITest(absltest.TestCase):
     # TODO(shoyer): verify RNG key works correctly
     # TODO(shoyer): verify RNG key is optional for deterministic models
 
+  def test_encoded_state(self):
+    model = load_tl63_stochastic_model()
+    ds_in = load_tl63_data()
+    data_in, forcings_in = model.data_from_xarray(ds_in.isel(time=0))
+
+    encoded = model.encode(data_in, forcings_in, rng_key=jax.random.key(0))
+
+    ds_advanced = model.data_to_xarray(
+        {
+            'vorticity': encoded.state.vorticity,
+            'divergence': encoded.state.divergence,
+        },
+        times=None,
+        decoded=False,
+    )
+
+    dims = ('level', 'longitudinal_mode', 'total_wavenumber')
+    z, x, y = model.model_coords.modal_shape
+    levels = np.linspace(1 - 1/32, 1 / 32, 32)
+    longitudinal_modes = np.array([(i//2) * (-1)**i for i in range(128)])
+    total_wavenumbers = np.arange(65)
+    expected = xarray.Dataset(
+        {
+            'vorticity': (dims, np.zeros((z, x, y))),
+            'divergence': (dims, np.zeros((z, x, y))),
+        },
+        coords={
+            'level': levels,
+            'longitudinal_mode': longitudinal_modes,
+            'total_wavenumber': total_wavenumbers,
+        },
+    )
+    # verify expected shpaes
+    xarray.testing.assert_allclose(ds_advanced, expected, atol=1e6)
 
 if __name__ == '__main__':
   absltest.main()
