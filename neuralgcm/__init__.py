@@ -14,8 +14,13 @@
 
 """Defines the neuralgcm module."""
 
+# pylint: disable=unused-import
+# pylint: disable=g-bad-import-order
+
+import neuralgcm.api
 import neuralgcm.correctors
 import neuralgcm.decoders
+import neuralgcm.demo
 import neuralgcm.diagnostics
 import neuralgcm.embeddings
 import neuralgcm.encoders
@@ -37,5 +42,6 @@ import neuralgcm.perturbations
 import neuralgcm.stochastic
 import neuralgcm.towers
 
-__version__ = "0.1.0"
+from neuralgcm.api import PressureLevelModel
 
+__version__ = "0.1.0"

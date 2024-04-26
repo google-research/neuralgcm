@@ -11,36 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import importlib.resources
-import pickle
-
 from absl.testing import absltest
-from dinosaur import horizontal_interpolation
-from dinosaur import pytree_utils
-from dinosaur import spherical_harmonic
 import jax
 import neuralgcm
-from neuralgcm import api
 import numpy as np
 import xarray
-
-
-def horizontal_regrid(
-    regridder: horizontal_interpolation.Regridder, dataset: xarray.Dataset
-) -> xarray.Dataset:
-  """Horizontally regrid an xarray Dataset."""
-  # TODO(shoyer): consider moving to public API
-  regridded = xarray.apply_ufunc(
-      regridder,
-      dataset,
-      input_core_dims=[['longitude', 'latitude']],
-      output_core_dims=[['longitude', 'latitude']],
-      exclude_dims={'longitude', 'latitude'},
-      vectorize=True,  # loops over level, for lower memory usage
-  )
-  regridded.coords['longitude'] = np.rad2deg(regridder.target_grid.longitudes)
-  regridded.coords['latitude'] = np.rad2deg(regridder.target_grid.latitudes)
-  return regridded
 
 
 def _assert_allclose(actual, desired, *, err_msg=None, range_rtol=1e-5):
@@ -50,21 +25,10 @@ def _assert_allclose(actual, desired, *, err_msg=None, range_rtol=1e-5):
   )
 
 
-def load_tl63_stochastic_model() -> api.PressureLevelModel:
-  package = importlib.resources.files(neuralgcm)
-  file = package.joinpath('data/tl63_stochastic_mini.pkl')
-  ckpt = pickle.loads(file.read_bytes())
-  return api.PressureLevelModel.from_checkpoint(ckpt)
-
-
-def load_tl63_data() -> xarray.Dataset:
-  package = importlib.resources.files(neuralgcm)
-  with package.joinpath('data/era5_tl31_19590102T00.nc').open('rb') as f:
-    ds = xarray.load_dataset(f).expand_dims('time')
-  regridder = horizontal_interpolation.ConservativeRegridder(
-      spherical_harmonic.Grid.TL31(), spherical_harmonic.Grid.TL63()
+def load_tl63_stochastic_model():
+  return neuralgcm.PressureLevelModel.from_checkpoint(
+      neuralgcm.demo.load_checkpoint_tl63_stochastic()
   )
-  return horizontal_regrid(regridder, ds)
 
 
 class APITest(absltest.TestCase):
@@ -115,7 +79,7 @@ class APITest(absltest.TestCase):
 
   def test_from_xarray(self):
     model = load_tl63_stochastic_model()
-    ds = load_tl63_data()
+    ds = neuralgcm.demo.load_data(model.data_coords)
 
     state_variables = [
         'u_component_of_wind',
@@ -151,7 +115,7 @@ class APITest(absltest.TestCase):
     dt = np.timedelta64(1, 'h')
 
     model = load_tl63_stochastic_model()
-    ds_in = load_tl63_data()
+    ds_in = neuralgcm.demo.load_data(model.data_coords)
 
     data_in, forcings_in = model.data_from_xarray(ds_in.isel(time=0))
     persistence_forcings = model.forcings_from_xarray(ds_in.head(time=1))
@@ -214,7 +178,7 @@ class APITest(absltest.TestCase):
 
   def test_encoded_state(self):
     model = load_tl63_stochastic_model()
-    ds_in = load_tl63_data()
+    ds_in = neuralgcm.demo.load_data(model.data_coords)
     data_in, forcings_in = model.data_from_xarray(ds_in.isel(time=0))
 
     encoded = model.encode(data_in, forcings_in, rng_key=jax.random.key(0))
@@ -246,6 +210,7 @@ class APITest(absltest.TestCase):
     )
     # verify expected shpaes
     xarray.testing.assert_allclose(ds_advanced, expected, atol=1e6)
+
 
 if __name__ == '__main__':
   absltest.main()

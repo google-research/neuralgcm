@@ -21,16 +21,14 @@ from typing import Any, Callable
 
 from dinosaur import coordinate_systems
 from dinosaur import scales
-from dinosaur import typing
 from dinosaur import time_integration
+from dinosaur import typing
 from dinosaur import xarray_utils
-import haiku as hk
 import jax
 from jax import tree_util
 import jax.numpy as jnp
 from neuralgcm import gin_utils
 from neuralgcm import model_builder
-from neuralgcm import model_utils
 from neuralgcm import physics_specifications
 import numpy as np
 import pandas as pd
