@@ -1,6 +1,6 @@
 # NeuralGCM: Neural General Circulation Models
 
-## Contents
+TODO: add demo
 
 ```{toctree}
 :maxdepth: 1

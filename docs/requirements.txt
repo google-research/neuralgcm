@@ -4,6 +4,5 @@ myst-nb==0.17.2
 myst-parser==0.18.1
 sphinx_rtd_theme==1.2.1
 sphinx==5.3.0
-scipy==1.10.1
 
 # TODO: neuralgcm requirements
