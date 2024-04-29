@@ -310,8 +310,8 @@ class PressureLevelModel:
       self, dataset: xarray.Dataset, variables: list[str]
   ) -> dict[str, np.ndarray]:
     self._check_coords(dataset)
-    dataset = dataset[variables]
     dataset = self._dataset_with_sim_time(dataset)
+    dataset = dataset[variables + ['sim_time']]
     dataset = _rename_if_found(dataset, {'longitude': 'lon', 'latitude': 'lat'})
     return xarray_utils.xarray_to_data_dict(dataset)
 
