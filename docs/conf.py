@@ -79,7 +79,13 @@ intersphinx_mapping = {
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = 'sphinx_rtd_theme'
+html_theme = 'furo'  # https://pradyunsg.me/furo/quickstart/
+html_logo = "neuralgcm-outline.png"
+html_theme_options = {
+    "source_repository": "https://github.com/google-research/neuralgcm/",
+    "source_branch": "main",
+    "source_directory": "docs/",
+}
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
@@ -90,10 +96,8 @@ html_static_path = ['_static']
 
 autosummary_generate = True
 
-# https://myst-nb.readthedocs.io/en/latest/use/execute.html
-jupyter_execute_notebooks = "cache"
-# https://myst-nb.readthedocs.io/en/latest/use/formatting_outputs.html#removing-stdout-and-stderr
-nb_output_stderr = "remove-warn"
+# https://myst-nb.readthedocs.io/en/latest/computation/execute.html
+nb_execution_mode = "off"
 
 # https://stackoverflow.com/a/66295922/809705
 autodoc_typehints = "description"

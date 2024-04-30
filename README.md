@@ -8,7 +8,7 @@ publication (arxiv 2023).
 
 ## Usage instructions
 
-We recommend using our inference-only API, as shown in the [demo notebook](https://colab.research.google.com/github/google-research/neuralgcm/blob/main/notebooks/neuralgcm_inference_demo.ipynb) (we are still working on complete documentation).
+We recommend using our inference-only API, as shown in the [demo notebook](https://colab.research.google.com/github/google-research/neuralgcm/blob/main/notebooks/demo/inference_demo.ipynb) (we are still working on complete documentation).
 Other parts of the NeuralGCM codebase are less stable and will likely be revised in backwards incompatible ways in the future.
 
 Note that evaluation results and archived forecasts for 2020 are also available as part of [WeatherBench2](https://sites.research.google/weatherbench/).
