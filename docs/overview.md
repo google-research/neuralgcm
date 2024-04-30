@@ -8,7 +8,8 @@ The NeuralGCM codebase consists of a handful of different components:
    for defining neural network layers.
 3. **ML training**: Pseudo-code for training NeuralGCM models can be found in
    the [`reference_code` subdirectory](https://github.com/google-research/neuralgcm/tree/main/neuralgcm/reference_code).
-4. **ML inference**: Code for running forecasts with pre-trained models.
+4. **ML inference**: Code for running forecasts with pre-trained models,
+   encapsulated in the {py:class}`~neuralgcm.PressureLevelModel` class.
 5. **Evaluation**: Code for evaluating NeuralGCM weather forecasts, along with
    saved re-forecasts, can be found in the [WeatherBench2](https://github.com/google-research/weatherbench2)
    project.
@@ -22,4 +23,4 @@ We would love to support training, modifying and fine-tuning NeuralGCM models,
 but with the present codebase based on Haiku and
 [Gin](https://github.com/google/gin-config) this much trickier than it needs to
 be. We are currently (in May 2024) refactoring the modeling code to improve
-usability and plan to release version soon.
+usability -- stay tuned!
