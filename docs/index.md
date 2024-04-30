@@ -1,6 +1,6 @@
 # NeuralGCM documentation
 
-TODO: add demo
+## Contents
 
 ```{toctree}
 :maxdepth: 1

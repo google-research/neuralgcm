@@ -80,11 +80,14 @@ intersphinx_mapping = {
 # a list of builtin themes.
 #
 html_theme = 'furo'  # https://pradyunsg.me/furo/quickstart/
-html_logo = "neuralgcm-outline.png"
+# html_logo = "neuralgcm-logo.png"
 html_theme_options = {
     "source_repository": "https://github.com/google-research/neuralgcm/",
     "source_branch": "main",
     "source_directory": "docs/",
+    "sidebar_hide_name": True,
+    "light_logo": "neuralgcm-logo-light.png",
+    "dark_logo": "neuralgcm-logo-dark.png",
 }
 
 # Add any paths that contain custom static files (such as style sheets) here,

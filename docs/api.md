@@ -91,9 +91,12 @@ inputs/outputs from learned methods:
 
 ## Demo dataset & models
 
-These constructors are useful testing purposes, to avoid the need to load large
-datasets from cloud storage. Instead, they rely on small test datasets packaged
-with the `neuralgcm` code.
+These constructors are useful for testing purposes, to avoid the need to load
+large datasets from cloud storage. Instead, they rely on small test datasets
+packaged with the `neuralgcm` code.
+
+For non-testing purposes, see the model checkpoints from the paper in the
+{doc}`./inference_demo`.
 
 ```{eval-rst}
 .. autosummary::
