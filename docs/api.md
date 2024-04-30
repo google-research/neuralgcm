@@ -17,7 +17,7 @@ The user-facing API for NeuralGCM models centers around `PressureLevelModel`:
 
 ### Constructor
 
-Use this class method to create a new model:
+Use this class method to create a new model from a saved checkpoint:
 
 ```{eval-rst}
 .. autosummary::
@@ -26,7 +26,21 @@ Use this class method to create a new model:
     PressureLevelModel.from_checkpoint
 ```
 
-### Properties
+### Attributes
+
+These intentionally undocumented attributes store the internal state of a
+`PressureLevelModel`. You can use them to introspect how a model is built.
+
+```{eval-rst}
+.. autosummary::
+    :toctree: _autosummary
+
+    PressureLevelModel.structure
+    PressureLevelModel.params
+    PressureLevelModel.gin_config
+```
+
+### Coordinate systems
 
 These properties describe the coordinate system on which a model is defined:
 

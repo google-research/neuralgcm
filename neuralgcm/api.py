@@ -189,10 +189,12 @@ class PressureLevelModel:
       params: Params,
       gin_config: str,
   ):
+    # internal model state
     self._structure = structure
     self._params = params
-    self.gin_config = gin_config
+    self._gin_config = gin_config
 
+    # calculated variables
     self._tracer_variables = [
         'specific_humidity',
     ]
@@ -222,17 +224,31 @@ class PressureLevelModel:
 
   def __repr__(self):
     return (
-        f'{self.__class__.__name__}(structure={self._structure},'
-        f' params={self._params})'
+        f'{self.__class__.__name__}(structure={self.structure},'
+        f' params=..., gin_config=...)'
     )
 
   @property
+  def structure(self) -> model_builder.WhirlModel:
+    """WhirlModel object encoding internal model structure.
+
+    Methods on object are not part of the NeuralGCM public API.
+    """
+    return self._structure
+
+  @property
   def params(self) -> Params:
+    """Nested dict of arrays containing trained model parameters."""
     return self._params
+
+  @property
+  def gin_config(self) -> str:
+    """Gin configuration string indicating how the model was built."""
+    return self._gin_config
 
   def tree_flatten(self):
     leaves, params_def = tree_util.tree_flatten(self.params)
-    return (leaves, (params_def, self._structure, self.gin_config))
+    return (leaves, (params_def, self.structure, self.gin_config))
 
   @classmethod
   def tree_unflatten(cls, aux_data, leaves):
@@ -485,7 +501,7 @@ class PressureLevelModel:
   ) -> tuple[State, BatchedOutputs]:
     """Unroll predictions over many time-steps.
 
-    Usage:
+    Usage::
 
       advanced_state, outputs = model.unroll(state, forcings, steps=N)
 
