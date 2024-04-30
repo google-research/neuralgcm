@@ -183,25 +183,6 @@ class PressureLevelModel:
   hence should remain stable even for future NeuralGCM models.
   """
 
-  _tracer_variables = [
-      'specific_humidity',
-      'specific_cloud_liquid_water_content',
-      'specific_cloud_ice_water_content',
-  ]
-  _input_variables = [
-      'geopotential',
-      'specific_cloud_ice_water_content',
-      'specific_cloud_liquid_water_content',
-      'specific_humidity',
-      'temperature',
-      'u_component_of_wind',
-      'v_component_of_wind',
-  ]
-  _forcing_variables = [
-      'sea_ice_cover',
-      'sea_surface_temperature',
-  ]
-
   def __init__(
       self,
       structure: model_builder.WhirlModel,
@@ -211,6 +192,33 @@ class PressureLevelModel:
     self._structure = structure
     self._params = params
     self.gin_config = gin_config
+
+    self._tracer_variables = [
+        'specific_humidity',
+    ]
+    self._input_variables = [
+        'geopotential',
+        'specific_humidity',
+        'temperature',
+        'u_component_of_wind',
+        'v_component_of_wind',
+    ]
+    # Some old model versions do not use cloud variables.
+    # TODO(shoyer): remove this once all integration tests are updated.
+    cloud_variables = [
+        'specific_cloud_ice_water_content',
+        'specific_cloud_liquid_water_content',
+    ]
+    for variable in cloud_variables:
+      if variable in self.gin_config:
+        self._tracer_variables.append(variable)
+        self._input_variables.append(variable)
+
+    self._forcing_variables = [
+        'sea_ice_cover',
+        'sea_surface_temperature',
+    ]
+
 
   def __repr__(self):
     return (
