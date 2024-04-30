@@ -5,6 +5,9 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools]
 packages = ["neuralgcm"]
 
+[tool.setuptools.package-data]
+"neuralgcm.data" = ["*"]
+
 [project]
 name = "neuralgcm"
 version = "0.1.0"
