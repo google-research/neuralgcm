@@ -10,5 +10,5 @@ pip install git+https://github.com/google-research/neuralgcm
 ```
 
 Note that NeuralGCM requires the development version of
-[Dinosaur](https://github.com/google-research/dinosuar), so if you update
+[Dinosaur](https://github.com/google-research/dinosaur), so if you update
 NeuralGCM you will probably need to update Dinosaur, too.
