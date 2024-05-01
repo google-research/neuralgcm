@@ -23,8 +23,8 @@ code that we can commit to supporting in roughly its current form.
 
 We would love to support training, modifying and fine-tuning NeuralGCM models,
 but with the present codebase based on Haiku and
-[Gin](https://github.com/google/gin-config) this much trickier than it needs to
-be. We are currently (in May 2024) refactoring the modeling code to improve
+[Gin](https://github.com/google/gin-config) this is much trickier than it needs
+to be. We are currently (in May 2024) refactoring the modeling code to improve
 usability -- stay tuned!
 
 ## Contents
