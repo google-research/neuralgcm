@@ -452,8 +452,8 @@ class PressureLevelModel:
         have a `level` dimension of size 1.
 
     Returns:
-      inputs: outputs on pressure-levels, as a dict where each entry is an
-        array with shape `[level, longitude, latitude]` matching `data_coords`.
+      Outputs on pressure-levels, as a dict where each entry is an array with
+      shape `[level, longitude, latitude]` matching `data_coords`.
     """
     sim_time = _sim_time_from_state(state)
     forcings = self._squeeze_level_from_forcings(forcings)
