@@ -35,17 +35,16 @@ import pandas as pd
 import xarray
 
 
-Params = dict[str, dict[str, jnp.ndarray]]
-
 ArrayLike = float | np.ndarray | jax.Array
+Params = dict[str, dict[str, ArrayLike]]
 TimedeltaLike = str | np.timedelta64 | pd.Timestamp | datetime.timedelta
 Numeric = float | np.ndarray | jax.Array | xarray.DataArray
 
 # TODO(shoyer): make these types more precise
 Inputs = dict[str, ArrayLike]
 Forcings = dict[str, ArrayLike]
-Outputs = dict[str, ArrayLike]
-BatchedOutputs = dict[str, ArrayLike]
+Outputs = dict[str, jax.Array]
+BatchedOutputs = dict[str, jax.Array]
 State = Any
 
 
