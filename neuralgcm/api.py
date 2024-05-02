@@ -219,7 +219,6 @@ class PressureLevelModel:
         'sea_surface_temperature',
     ]
 
-
   def __repr__(self):
     return (
         f'{self.__class__.__name__}(structure={self._structure},'
@@ -239,6 +238,16 @@ class PressureLevelModel:
     params_def, structure, gin_config = aux_data
     params = tree_util.tree_unflatten(params_def, leaves)
     return cls(structure, params, gin_config)
+
+  @property
+  def input_variables(self) -> list[str]:
+    """List of variable names required in `inputs` by this model."""
+    return list(self._input_variables)
+
+  @property
+  def forcing_variables(self) -> list[str]:
+    """List of variable names required in `forcings` by this model."""
+    return list(self._forcing_variables)
 
   @property
   def timestep(self) -> np.timedelta64:

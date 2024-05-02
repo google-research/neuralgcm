@@ -28,7 +28,8 @@ Use this class method to create a new model:
 
 ### Properties
 
-These properties describe the coordinate system on which a model is defined:
+These properties describe the coordinate system and variables for which a model
+is defined:
 
 ```{eval-rst}
 .. autosummary::
@@ -37,6 +38,8 @@ These properties describe the coordinate system on which a model is defined:
     PressureLevelModel.timestep
     PressureLevelModel.data_coords
     PressureLevelModel.model_coords
+    PressureLevelModel.input_variables
+    PressureLevelModel.forcing_variables
 ```
 
 ### Learned methods

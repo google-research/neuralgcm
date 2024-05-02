@@ -57,6 +57,32 @@ class APITest(absltest.TestCase):
       else:
         _assert_allclose(x, y, err_msg=err_msg2, range_rtol=range_rtol)
 
+  def test_model_properties(self):
+    model = load_tl63_stochastic_model()
+
+    self.assertEqual(model.timestep, np.timedelta64(1, 'h'))
+
+    expected_inputs = [
+        'geopotential',
+        'specific_humidity',
+        'temperature',
+        'u_component_of_wind',
+        'v_component_of_wind',
+        'specific_cloud_ice_water_content',
+        'specific_cloud_liquid_water_content',
+    ]
+    self.assertEqual(model.input_variables, expected_inputs)
+
+    expected_forcings = [
+        'sea_ice_cover',
+        'sea_surface_temperature',
+    ]
+    self.assertEqual(model.forcing_variables, expected_forcings)
+
+    self.assertEqual(model.data_coords.nodal_shape, (37, 128, 64))
+
+    self.assertEqual(model.model_coords.nodal_shape, (32, 128, 64))
+
   def test_to_and_from_nondim_units(self):
     model = load_tl63_stochastic_model()
 
