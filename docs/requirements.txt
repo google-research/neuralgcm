@@ -1,8 +1,12 @@
-# doc requirements
+# doc build requirements
 furo==2024.4.27
 Jinja2==3.1.3
 myst-nb==1.1.0
 myst-parser==3.0.1
 sphinx==7.3.7
+
+# TODO: doc runtime requirements
+# optax
+# gcsfs
 
 # TODO: neuralgcm requirements
