@@ -1,0 +1,2911 @@
+# Macros:
+# ==============================================================================
+ACTIVATION = @gelu
+CORRECTOR_MODULE = @CustomCoordsCorrector
+CORRECTOR_SCALE = 0.01
+DATA_FILTER_ATTENUATION = 0.0
+DYCORE_FILTER_ORDER = 3
+DYCORE_GRID = @smaller/GridWithWavenumbers()
+DYCORE_INTEGRATOR = @imex_rk_sil3
+DYCORE_TAU = '120 minutes'
+GLOBAL_OUT_SCALE = 0.02
+INPUT_FILTER_ATTEN = 5
+INPUT_FILTER_ORDER = 15
+LATENT_SIZE = 384
+LAYER_SIZE = 384
+N_CNN_FEATURES = 32
+N_INNER_DYCORE_STEPS = 5
+N_SIGMA_LAYERS = 32
+N_TO_CLIP = 1
+NUM_BLOCKS = 5
+NUM_SUBSTEPS = 1
+PARAMETERIZATION_FILTER = @ml/SequentialStepFilter
+POSITIONAL_LATENT_SIZE = 8
+STABILITY_TAU = '4 minutes'
+SURFACE_MODEL_LATENT_SIZE = 8
+SURFACE_MODEL_LAYER_SIZE = 8
+SURFACE_MODEL_OUTPUT_SIZE = 8
+
+# Parameters for decode/ColumnTower:
+# ==============================================================================
+decode/ColumnTower.checkpoint_tower = False
+decode/ColumnTower.column_net_factory = @decode/MlpUniform
+decode/ColumnTower.name = 'decode_tower'
+
+# Parameters for encode/ColumnTower:
+# ==============================================================================
+encode/ColumnTower.checkpoint_tower = False
+encode/ColumnTower.column_net_factory = @encode/MlpUniform
+encode/ColumnTower.name = 'encode_tower'
+
+# Parameters for process/ColumnTower:
+# ==============================================================================
+process/ColumnTower.checkpoint_tower = False
+process/ColumnTower.column_net_factory = @process/MlpUniform
+process/ColumnTower.name = 'process_tower'
+
+# Parameters for surface_model_decode/ColumnTower:
+# ==============================================================================
+surface_model_decode/ColumnTower.checkpoint_tower = False
+surface_model_decode/ColumnTower.column_net_factory = \
+    @surface_model_decode/MlpUniform
+surface_model_decode/ColumnTower.name = 'surface_model_decode_tower'
+
+# Parameters for surface_model_encode/ColumnTower:
+# ==============================================================================
+surface_model_encode/ColumnTower.checkpoint_tower = False
+surface_model_encode/ColumnTower.column_net_factory = \
+    @surface_model_encode/MlpUniform
+surface_model_encode/ColumnTower.name = 'surface_model_encode_tower'
+
+# Parameters for surface_model_process/ColumnTower:
+# ==============================================================================
+surface_model_process/ColumnTower.checkpoint_tower = False
+surface_model_process/ColumnTower.column_net_factory = \
+    @surface_model_process/MlpUniform
+surface_model_process/ColumnTower.name = 'surface_model_process_tower'
+
+# Parameters for advance/CombinedFeatures:
+# ==============================================================================
+advance/CombinedFeatures.feature_module_names_to_exclude = ()
+advance/CombinedFeatures.feature_modules = \
+    (@EmbeddingSurfaceFeatures,
+     @EmbeddingVolumeFeatures,
+     @PressureFeatures,
+     @RadiationFeatures,
+     @LatitudeFeatures,
+     @advance/VelocityAndPrognostics,
+     @MemoryVelocityAndValues,
+     @with_grads/FloatDataFeatures,
+     @without_grads/FloatDataFeatures,
+     @LearnedPositionalFeatures)
+advance/CombinedFeatures.features_to_exclude = ()
+advance/CombinedFeatures.features_transform_module = @advance/SequentialTransform
+advance/CombinedFeatures.name = None
+
+# Parameters for decoder_model/CombinedFeatures:
+# ==============================================================================
+decoder_model/CombinedFeatures.feature_module_names_to_exclude = ()
+decoder_model/CombinedFeatures.feature_modules = \
+    (@RadiationFeatures,
+     @LatitudeFeatures,
+     @decoder_model/VelocityAndPrognostics,
+     @with_grads/FloatDataFeatures,
+     @without_grads/FloatDataFeatures,
+     @LearnedPositionalFeatures)
+decoder_model/CombinedFeatures.features_to_exclude = ()
+decoder_model/CombinedFeatures.features_transform_module = \
+    @decoder_model/SequentialTransform
+decoder_model/CombinedFeatures.name = None
+
+# Parameters for embedding_model/CombinedFeatures:
+# ==============================================================================
+embedding_model/CombinedFeatures.feature_module_names_to_exclude = ()
+embedding_model/CombinedFeatures.feature_modules = \
+    (@embedding_model/VelocityAndPrognostics, @PressureFeatures)
+embedding_model/CombinedFeatures.features_to_exclude = ()
+embedding_model/CombinedFeatures.features_transform_module = \
+    @embedding_model/ShiftAndNormalize
+embedding_model/CombinedFeatures.name = None
+
+# Parameters for encoder_data/CombinedFeatures:
+# ==============================================================================
+encoder_data/CombinedFeatures.feature_module_names_to_exclude = ()
+encoder_data/CombinedFeatures.feature_modules = \
+    (@RadiationFeatures,
+     @LatitudeFeatures,
+     @encoder_data/VelocityAndPrognostics,
+     @with_grads/FloatDataFeatures,
+     @without_grads/FloatDataFeatures,
+     @LearnedPositionalFeatures)
+encoder_data/CombinedFeatures.features_to_exclude = ()
+encoder_data/CombinedFeatures.features_transform_module = \
+    @encoder_data/SequentialTransform
+encoder_data/CombinedFeatures.name = None
+
+# Parameters for land_model/CombinedFeatures:
+# ==============================================================================
+land_model/CombinedFeatures.feature_module_names_to_exclude = ()
+land_model/CombinedFeatures.feature_modules = (@land_model/VelocityAndPrognostics,)
+land_model/CombinedFeatures.features_to_exclude = ()
+land_model/CombinedFeatures.features_transform_module = \
+    @land_model/ShiftAndNormalize
+land_model/CombinedFeatures.name = None
+
+# Parameters for sea_ice_model/CombinedFeatures:
+# ==============================================================================
+sea_ice_model/CombinedFeatures.feature_module_names_to_exclude = ()
+sea_ice_model/CombinedFeatures.feature_modules = \
+    (@sea_ice_model/VelocityAndPrognostics, @sea_ice_model/ForcingFeatures)
+sea_ice_model/CombinedFeatures.features_to_exclude = ()
+sea_ice_model/CombinedFeatures.features_transform_module = \
+    @sea_ice_model/ShiftAndNormalize
+sea_ice_model/CombinedFeatures.name = None
+
+# Parameters for sea_model/CombinedFeatures:
+# ==============================================================================
+sea_model/CombinedFeatures.feature_module_names_to_exclude = ()
+sea_model/CombinedFeatures.feature_modules = (@sea_model/ForcingFeatures,)
+sea_model/CombinedFeatures.features_to_exclude = ()
+sea_model/CombinedFeatures.features_transform_module = @sea_model/ShiftAndNormalize
+sea_model/CombinedFeatures.name = None
+
+# Parameters for coordinate_system_from_dataset:
+# ==============================================================================
+coordinate_system_from_dataset.spherical_harmonics_impl = None
+coordinate_system_from_dataset.truncation = 'LINEAR'
+
+# Parameters for CoordinateSystem:
+# ==============================================================================
+CoordinateSystem.horizontal = @GridTL63()
+CoordinateSystem.vertical = @SigmaCoordinatesEquidistant()
+
+# Parameters for custom_corrds/CoordinateSystem:
+# ==============================================================================
+custom_corrds/CoordinateSystem.horizontal = %DYCORE_GRID
+custom_corrds/CoordinateSystem.vertical = @SigmaCoordinatesEquidistant()
+
+# Parameters for CustomCoordsCorrector:
+# ==============================================================================
+CustomCoordsCorrector.corrector_module = @DycoreWithPhysicsCorrector
+CustomCoordsCorrector.custom_coords = @custom_corrds/CoordinateSystem()
+CustomCoordsCorrector.name = None
+
+# Parameters for data_to_xarray_with_renaming:
+# ==============================================================================
+data_to_xarray_with_renaming.additional_coords = None
+data_to_xarray_with_renaming.attrs = None
+data_to_xarray_with_renaming.renaming_dict = \
+    {'geopotential': 'z',
+     'latitude': 'lat',
+     'longitude': 'lon',
+     'temperature': 't',
+     'u_component_of_wind': 'u',
+     'v_component_of_wind': 'v'}
+data_to_xarray_with_renaming.sample_ids = None
+data_to_xarray_with_renaming.to_xarray_fn = @primitive_eq_to_xarray
+
+# Parameters for encoder/DataExponentialFilter:
+# ==============================================================================
+encoder/DataExponentialFilter.attenuation = %INPUT_FILTER_ATTEN
+encoder/DataExponentialFilter.cutoff = 0
+encoder/DataExponentialFilter.name = None
+encoder/DataExponentialFilter.order = %INPUT_FILTER_ORDER
+
+# Parameters for orography/DataExponentialFilter:
+# ==============================================================================
+orography/DataExponentialFilter.attenuation = %DATA_FILTER_ATTENUATION
+orography/DataExponentialFilter.cutoff = 0
+orography/DataExponentialFilter.name = None
+orography/DataExponentialFilter.order = 1
+
+# Parameters for DimensionalLearnedPrimitiveToWeatherbenchDecoder:
+# ==============================================================================
+DimensionalLearnedPrimitiveToWeatherbenchDecoder.correction_transform_module = \
+    @decoder/SequentialTransform
+DimensionalLearnedPrimitiveToWeatherbenchDecoder.inputs_to_units_mapping = \
+    {'sim_time': 'dimensionless',
+     't': 'kelvin',
+     'tracers': {'specific_cloud_ice_water_content': 'dimensionless',
+                 'specific_cloud_liquid_water_content': 'dimensionless',
+                 'specific_humidity': 'dimensionless'},
+     'u': 'meter / second',
+     'v': 'meter / second',
+     'z': 'm**2 s**-2'}
+DimensionalLearnedPrimitiveToWeatherbenchDecoder.modal_to_nodal_data_features_module = \
+    @NullFeatures
+DimensionalLearnedPrimitiveToWeatherbenchDecoder.modal_to_nodal_model_features_module = \
+    @decoder_model/CombinedFeatures
+DimensionalLearnedPrimitiveToWeatherbenchDecoder.name = None
+DimensionalLearnedPrimitiveToWeatherbenchDecoder.nodal_mapping_module = \
+    @NodalMapping
+DimensionalLearnedPrimitiveToWeatherbenchDecoder.orography_module = \
+    @FilteredCustomOrography
+DimensionalLearnedPrimitiveToWeatherbenchDecoder.prediction_mask = \
+    {'sim_time': False,
+     't': True,
+     'tracers': {'specific_cloud_ice_water_content': True,
+                 'specific_cloud_liquid_water_content': True,
+                 'specific_humidity': True},
+     'u': True,
+     'v': True,
+     'z': True}
+DimensionalLearnedPrimitiveToWeatherbenchDecoder.time_axis = 0
+
+# Parameters for DimensionalLearnedWeatherbenchToPrimitiveWithMemoryEncoder:
+# ==============================================================================
+DimensionalLearnedWeatherbenchToPrimitiveWithMemoryEncoder.correction_transform_module = \
+    @encode/SequentialTransform
+DimensionalLearnedWeatherbenchToPrimitiveWithMemoryEncoder.inputs_to_units_mapping = \
+    {'sim_time': 'dimensionless',
+     't': 'kelvin',
+     'tracers': {'specific_cloud_ice_water_content': 'dimensionless',
+                 'specific_cloud_liquid_water_content': 'dimensionless',
+                 'specific_humidity': 'dimensionless'},
+     'u': 'meter / second',
+     'v': 'meter / second',
+     'z': 'm**2 s**-2'}
+DimensionalLearnedWeatherbenchToPrimitiveWithMemoryEncoder.modal_to_nodal_data_features_module = \
+    @encoder_data/CombinedFeatures
+DimensionalLearnedWeatherbenchToPrimitiveWithMemoryEncoder.modal_to_nodal_model_features_module = \
+    @NullFeatures
+DimensionalLearnedWeatherbenchToPrimitiveWithMemoryEncoder.name = None
+DimensionalLearnedWeatherbenchToPrimitiveWithMemoryEncoder.nodal_mapping_module = \
+    @NodalMapping
+DimensionalLearnedWeatherbenchToPrimitiveWithMemoryEncoder.orography_module = \
+    @LearnedOrography
+DimensionalLearnedWeatherbenchToPrimitiveWithMemoryEncoder.prediction_mask = \
+    {'divergence': True,
+     'log_surface_pressure': True,
+     'sim_time': False,
+     'temperature_variation': True,
+     'tracers': {'specific_cloud_ice_water_content': True,
+                 'specific_cloud_liquid_water_content': True,
+                 'specific_humidity': True},
+     'vorticity': True}
+DimensionalLearnedWeatherbenchToPrimitiveWithMemoryEncoder.time_axis = 0
+DimensionalLearnedWeatherbenchToPrimitiveWithMemoryEncoder.transform_module = \
+    @EncoderCombinedTransform
+
+# Parameters for DivCurlNeuralParameterization:
+# ==============================================================================
+DivCurlNeuralParameterization.filter_module = %PARAMETERIZATION_FILTER
+DivCurlNeuralParameterization.modal_to_nodal_features_module = \
+    @advance/CombinedFeatures
+DivCurlNeuralParameterization.name = None
+DivCurlNeuralParameterization.nodal_mapping_module = @NodalMapping
+DivCurlNeuralParameterization.prediction_mask = \
+    {'divergence': True,
+     'log_surface_pressure': False,
+     'sim_time': False,
+     'temperature_variation': True,
+     'tracers': {'specific_cloud_ice_water_content': True,
+                 'specific_cloud_liquid_water_content': True,
+                 'specific_humidity': True},
+     'vorticity': True}
+DivCurlNeuralParameterization.tendency_transform_module = \
+    @div_curl_tendency_outputs/SequentialTransform
+
+# Parameters for DycoreWithPhysicsCorrector:
+# ==============================================================================
+DycoreWithPhysicsCorrector.checkpoint_explicit_terms = True
+DycoreWithPhysicsCorrector.dycore_equation_module = \
+    @MoistPrimitiveEquationsWithCloudMoisture
+DycoreWithPhysicsCorrector.dycore_substeps = %N_INNER_DYCORE_STEPS
+DycoreWithPhysicsCorrector.filter_module = @dycore/SequentialStepFilter
+DycoreWithPhysicsCorrector.name = None
+DycoreWithPhysicsCorrector.time_integrator = %DYCORE_INTEGRATOR
+
+# Parameters for DynamicDataForcing:
+# ==============================================================================
+DynamicDataForcing.check_sim_time_errors = False
+DynamicDataForcing.data_time_step = '6 hours'
+DynamicDataForcing.dt_tolerance = '1 year'
+DynamicDataForcing.inputs_to_units_mapping = \
+    {'sea_ice_cover': 'dimensionless',
+     'sea_surface_temperature': 'kelvin',
+     'sim_time': 'dimensionless'}
+DynamicDataForcing.name = None
+DynamicDataForcing.time_axis = 0
+
+# Parameters for advance/EmbeddingSurfaceFeatures:
+# ==============================================================================
+advance/EmbeddingSurfaceFeatures.embedding_module = @NodalLandSeaIceEmbedding
+advance/EmbeddingSurfaceFeatures.feature_name = 'surface_embedding'
+advance/EmbeddingSurfaceFeatures.name = None
+advance/EmbeddingSurfaceFeatures.output_size = %SURFACE_MODEL_OUTPUT_SIZE
+
+# Parameters for advance/EmbeddingVolumeFeatures:
+# ==============================================================================
+advance/EmbeddingVolumeFeatures.embedding_module = @ModalToNodalEmbedding
+advance/EmbeddingVolumeFeatures.feature_name = 'CNN1D'
+advance/EmbeddingVolumeFeatures.name = None
+advance/EmbeddingVolumeFeatures.output_size = %N_CNN_FEATURES
+
+# Parameters for EncoderCombinedTransform:
+# ==============================================================================
+EncoderCombinedTransform.name = None
+EncoderCombinedTransform.transforms = \
+    (@InputClipTransform, @EncoderFilterTransform)
+
+# Parameters for EncoderFilterTransform:
+# ==============================================================================
+EncoderFilterTransform.filter_modules = (@encoder/DataExponentialFilter,)
+EncoderFilterTransform.name = None
+
+# Parameters for EpdTower:
+# ==============================================================================
+EpdTower.decode_tower_factory = @decode/ColumnTower
+EpdTower.encode_tower_factory = @encode/ColumnTower
+EpdTower.final_activation = None
+EpdTower.latent_size = %LATENT_SIZE
+EpdTower.name = None
+EpdTower.num_process_blocks = %NUM_BLOCKS
+EpdTower.post_encode_activation = None
+EpdTower.pre_decode_activation = None
+EpdTower.process_tower_factory = @process/ColumnTower
+
+# Parameters for surface_model/EpdTower:
+# ==============================================================================
+surface_model/EpdTower.decode_tower_factory = @surface_model_decode/ColumnTower
+surface_model/EpdTower.encode_tower_factory = @surface_model_encode/ColumnTower
+surface_model/EpdTower.final_activation = None
+surface_model/EpdTower.latent_size = %SURFACE_MODEL_LATENT_SIZE
+surface_model/EpdTower.name = None
+surface_model/EpdTower.num_process_blocks = 1
+surface_model/EpdTower.post_encode_activation = None
+surface_model/EpdTower.pre_decode_activation = None
+surface_model/EpdTower.process_tower_factory = @surface_model_process/ColumnTower
+
+# Parameters for dycore/ExponentialFilter:
+# ==============================================================================
+dycore/ExponentialFilter.cutoff = 0
+dycore/ExponentialFilter.name = None
+dycore/ExponentialFilter.order = %DYCORE_FILTER_ORDER
+dycore/ExponentialFilter.tau = %DYCORE_TAU
+
+# Parameters for stability/ExponentialFilter:
+# ==============================================================================
+stability/ExponentialFilter.cutoff = 0.4
+stability/ExponentialFilter.name = None
+stability/ExponentialFilter.order = 10
+stability/ExponentialFilter.tau = %STABILITY_TAU
+
+# Parameters for FilteredCustomOrography:
+# ==============================================================================
+FilteredCustomOrography.filter_modules = (@orography/DataExponentialFilter,)
+FilteredCustomOrography.name = None
+FilteredCustomOrography.orography_data_path = None
+FilteredCustomOrography.renaming_dict = {'latitude': 'lat', 'longitude': 'lon'}
+
+# Parameters for with_grads/FloatDataFeatures:
+# ==============================================================================
+with_grads/FloatDataFeatures.compute_gradients_module = @ToModalDiffOperators
+with_grads/FloatDataFeatures.covariate_data_path = None
+with_grads/FloatDataFeatures.covariate_keys = ('geopotential_at_surface',)
+with_grads/FloatDataFeatures.name = None
+with_grads/FloatDataFeatures.renaming_dict = \
+    {'latitude': 'lat', 'longitude': 'lon'}
+
+# Parameters for without_grads/FloatDataFeatures:
+# ==============================================================================
+without_grads/FloatDataFeatures.covariate_data_path = None
+without_grads/FloatDataFeatures.covariate_keys = ('land_sea_mask',)
+without_grads/FloatDataFeatures.name = None
+without_grads/FloatDataFeatures.renaming_dict = \
+    {'latitude': 'lat', 'longitude': 'lon'}
+
+# Parameters for sea_ice_model/ForcingFeatures:
+# ==============================================================================
+sea_ice_model/ForcingFeatures.forcing_to_include = ('sea_ice_cover',)
+sea_ice_model/ForcingFeatures.name = None
+
+# Parameters for sea_model/ForcingFeatures:
+# ==============================================================================
+sea_model/ForcingFeatures.forcing_to_include = ('sea_surface_temperature',)
+sea_model/ForcingFeatures.name = None
+
+# Parameters for gelu:
+# ==============================================================================
+gelu.approximate = True
+
+# Parameters for GET_ATMOSPHERIC_SCALE:
+# ==============================================================================
+# None.
+
+# Parameters for get_model_specs:
+# ==============================================================================
+get_model_specs.custom_coords = @CoordinateSystem()
+get_model_specs.model_time_step = '1 hour'
+get_model_specs.reference_datetime_str = None
+get_model_specs.reference_temperature = \
+    [223.58614815,
+     211.47405876,
+     205.87815406,
+     206.40755302,
+     210.43452345,
+     214.5683887,
+     218.75303863,
+     223.23145107,
+     227.9710687,
+     232.85381503,
+     237.53588735,
+     242.05068293,
+     246.29986585,
+     250.14294113,
+     253.74839535,
+     256.98024283,
+     259.94441031,
+     262.7041158,
+     265.21752838,
+     267.62333985,
+     269.94462121,
+     272.10056439,
+     274.12518288,
+     275.99833711,
+     277.72759392,
+     279.3292128,
+     280.79178708,
+     282.13507065,
+     283.41832023,
+     284.7682506,
+     286.33945487,
+     288.06707666]
+
+# Parameters for get_physics_specs:
+# ==============================================================================
+get_physics_specs.construct_fn = @primitive_eq_specs_constructor
+
+# Parameters for GridTL63:
+# ==============================================================================
+# None.
+
+# Parameters for smaller/GridWithWavenumbers:
+# ==============================================================================
+smaller/GridWithWavenumbers.dealiasing = 'quadratic'
+smaller/GridWithWavenumbers.latitude_spacing = 'gauss'
+smaller/GridWithWavenumbers.longitude_offset = 0.0
+smaller/GridWithWavenumbers.longitude_wavenumbers = 63
+smaller/GridWithWavenumbers.radius = None
+
+# Parameters for advance/IdentityTransform:
+# ==============================================================================
+advance/IdentityTransform.name = None
+
+# Parameters for land_model/IdentityTransform:
+# ==============================================================================
+land_model/IdentityTransform.name = None
+
+# Parameters for sea_ice_model/IdentityTransform:
+# ==============================================================================
+sea_ice_model/IdentityTransform.name = None
+
+# Parameters for sea_model/IdentityTransform:
+# ==============================================================================
+sea_model/IdentityTransform.name = None
+
+# Parameters for imex_rk_sil3:
+# ==============================================================================
+# None.
+
+# Parameters for InputClipTransform:
+# ==============================================================================
+InputClipTransform.name = None
+InputClipTransform.wavenumbers_to_clip = %N_TO_CLIP
+
+# Parameters for advance/InverseLevelScale:
+# ==============================================================================
+advance/InverseLevelScale.keys_to_scale = \
+    ['specific_humidity',
+     'specific_humidity_del2',
+     'specific_humidity_dlat',
+     'specific_humidity_dlon']
+advance/InverseLevelScale.name = None
+advance/InverseLevelScale.scales = \
+    [8.825e-05,
+     7.041e-05,
+     0.0001044,
+     0.0001832,
+     0.0007474,
+     0.002588,
+     0.007067,
+     0.01524,
+     0.02838,
+     0.04518,
+     0.06902,
+     0.09718,
+     0.1316,
+     0.1716,
+     0.2182,
+     0.2748,
+     0.3379,
+     0.4073,
+     0.4611,
+     0.5177,
+     0.5798,
+     0.6547,
+     0.7397,
+     0.8362,
+     0.9373,
+     1.041,
+     1.149,
+     1.265,
+     1.394,
+     1.551,
+     1.71,
+     1.792]
+
+# Parameters for decoder_model/InverseLevelScale:
+# ==============================================================================
+decoder_model/InverseLevelScale.keys_to_scale = \
+    ['specific_humidity',
+     'specific_humidity_del2',
+     'specific_humidity_dlat',
+     'specific_humidity_dlon']
+decoder_model/InverseLevelScale.name = None
+decoder_model/InverseLevelScale.scales = \
+    [8.825e-05,
+     7.041e-05,
+     0.0001044,
+     0.0001832,
+     0.0007474,
+     0.002588,
+     0.007067,
+     0.01524,
+     0.02838,
+     0.04518,
+     0.06902,
+     0.09718,
+     0.1316,
+     0.1716,
+     0.2182,
+     0.2748,
+     0.3379,
+     0.4073,
+     0.4611,
+     0.5177,
+     0.5798,
+     0.6547,
+     0.7397,
+     0.8362,
+     0.9373,
+     1.041,
+     1.149,
+     1.265,
+     1.394,
+     1.551,
+     1.71,
+     1.792]
+
+# Parameters for encoder_data/InverseLevelScale:
+# ==============================================================================
+encoder_data/InverseLevelScale.keys_to_scale = \
+    ['specific_humidity',
+     'specific_humidity_del2',
+     'specific_humidity_dlat',
+     'specific_humidity_dlon']
+encoder_data/InverseLevelScale.name = None
+encoder_data/InverseLevelScale.scales = \
+    [3.792e-05,
+     5.989e-05,
+     7.112e-05,
+     8.21e-05,
+     8.842e-05,
+     9.109e-05,
+     7.706e-05,
+     7.156e-05,
+     8.221e-05,
+     9.83e-05,
+     0.0001427,
+     0.0002927,
+     0.001,
+     0.002714,
+     0.006034,
+     0.01158,
+     0.01969,
+     0.04488,
+     0.08384,
+     0.1362,
+     0.2039,
+     0.2933,
+     0.3992,
+     0.4827,
+     0.5746,
+     0.6994,
+     0.8461,
+     0.9233,
+     1.001,
+     1.08,
+     1.162,
+     1.248,
+     1.339,
+     1.448,
+     1.579,
+     1.675,
+     1.712]
+
+# Parameters for decoder/InverseShiftAndNormalize:
+# ==============================================================================
+decoder/InverseShiftAndNormalize.global_scale = %CORRECTOR_SCALE
+decoder/InverseShiftAndNormalize.name = None
+decoder/InverseShiftAndNormalize.scales = \
+    {'sim_time': 0.0,
+     't': 28.0,
+     'tracers': {'specific_cloud_ice_water_content': 0.00012966,
+                 'specific_cloud_liquid_water_content': 0.0003412,
+                 'specific_humidity': 0.003474},
+     'u': 0.01924,
+     'v': 0.0102,
+     'z': 0.1496}
+decoder/InverseShiftAndNormalize.shifts = \
+    {'sim_time': 0.0,
+     't': 0.0,
+     'tracers': {'specific_cloud_ice_water_content': 0.0,
+                 'specific_cloud_liquid_water_content': 0.0,
+                 'specific_humidity': 0.0},
+     'u': 0.0,
+     'v': 0.0,
+     'z': 0.0}
+
+# Parameters for div_curl_tendency_outputs/InverseShiftAndNormalize:
+# ==============================================================================
+div_curl_tendency_outputs/InverseShiftAndNormalize.global_scale = %GLOBAL_OUT_SCALE
+div_curl_tendency_outputs/InverseShiftAndNormalize.name = None
+div_curl_tendency_outputs/InverseShiftAndNormalize.scales = \
+    {'log_surface_pressure': 0.0497,
+     'sim_time': 0.0,
+     'temperature_variation': 33.62,
+     'tracers': {'specific_cloud_ice_water_content': 0.0007559999999999999,
+                 'specific_cloud_liquid_water_content': 0.0014856000000000001,
+                 'specific_humidity': 0.005841},
+     'u': 0.0576,
+     'v': 0.0506}
+div_curl_tendency_outputs/InverseShiftAndNormalize.shifts = \
+    {'log_surface_pressure': 0.0,
+     'sim_time': 0.0,
+     'temperature_variation': 0.0,
+     'tracers': {'specific_cloud_ice_water_content': 0.0,
+                 'specific_cloud_liquid_water_content': 0.0,
+                 'specific_humidity': 0.0},
+     'u': 0.0,
+     'v': 0.0}
+
+# Parameters for encoder/InverseShiftAndNormalize:
+# ==============================================================================
+encoder/InverseShiftAndNormalize.global_scale = %CORRECTOR_SCALE
+encoder/InverseShiftAndNormalize.name = None
+encoder/InverseShiftAndNormalize.scales = \
+    {'divergence': 0.05232,
+     'log_surface_pressure': 0.1096,
+     'sim_time': 0.0,
+     'temperature_variation': 14.73,
+     'tracers': {'specific_cloud_ice_water_content': 0.00015690000000000002,
+                 'specific_cloud_liquid_water_content': 0.00032960000000000004,
+                 'specific_humidity': 0.003281},
+     'vorticity': 0.2168}
+encoder/InverseShiftAndNormalize.shifts = \
+    {'divergence': 0.0,
+     'log_surface_pressure': 0.0,
+     'sim_time': 0.0,
+     'temperature_variation': 0.0,
+     'tracers': {'specific_cloud_ice_water_content': 0.0,
+                 'specific_cloud_liquid_water_content': 0.0,
+                 'specific_humidity': 0.0},
+     'vorticity': 0.0}
+
+# Parameters for advance/LatitudeFeatures:
+# ==============================================================================
+advance/LatitudeFeatures.name = None
+
+# Parameters for decoder_model/LatitudeFeatures:
+# ==============================================================================
+decoder_model/LatitudeFeatures.name = None
+
+# Parameters for encoder_data/LatitudeFeatures:
+# ==============================================================================
+encoder_data/LatitudeFeatures.name = None
+
+# Parameters for LearnedOrography:
+# ==============================================================================
+LearnedOrography.base_orography_module = @FilteredCustomOrography
+LearnedOrography.correction_scale = 1e-05
+LearnedOrography.name = None
+
+# Parameters for advance/LearnedPositionalFeatures:
+# ==============================================================================
+advance/LearnedPositionalFeatures.latent_size = %POSITIONAL_LATENT_SIZE
+advance/LearnedPositionalFeatures.name = None
+advance/LearnedPositionalFeatures.scale = 1.0
+
+# Parameters for decoder_model/LearnedPositionalFeatures:
+# ==============================================================================
+decoder_model/LearnedPositionalFeatures.latent_size = %POSITIONAL_LATENT_SIZE
+decoder_model/LearnedPositionalFeatures.name = None
+decoder_model/LearnedPositionalFeatures.scale = 1.0
+
+# Parameters for encoder_data/LearnedPositionalFeatures:
+# ==============================================================================
+encoder_data/LearnedPositionalFeatures.latent_size = %POSITIONAL_LATENT_SIZE
+encoder_data/LearnedPositionalFeatures.name = None
+encoder_data/LearnedPositionalFeatures.scale = 1.0
+
+# Parameters for decoder/LevelScale:
+# ==============================================================================
+decoder/LevelScale.keys_to_scale = ['specific_humidity']
+decoder/LevelScale.name = None
+decoder/LevelScale.scales = \
+    [3.792e-05,
+     5.989e-05,
+     7.112e-05,
+     8.21e-05,
+     8.842e-05,
+     9.109e-05,
+     7.706e-05,
+     7.156e-05,
+     8.221e-05,
+     9.83e-05,
+     0.0001427,
+     0.0002927,
+     0.001,
+     0.002714,
+     0.006034,
+     0.01158,
+     0.01969,
+     0.04488,
+     0.08384,
+     0.1362,
+     0.2039,
+     0.2933,
+     0.3992,
+     0.4827,
+     0.5746,
+     0.6994,
+     0.8461,
+     0.9233,
+     1.001,
+     1.08,
+     1.162,
+     1.248,
+     1.339,
+     1.448,
+     1.579,
+     1.675,
+     1.712]
+
+# Parameters for div_curl_tendency_outputs/LevelScale:
+# ==============================================================================
+div_curl_tendency_outputs/LevelScale.keys_to_scale = ['specific_humidity']
+div_curl_tendency_outputs/LevelScale.name = None
+div_curl_tendency_outputs/LevelScale.scales = \
+    [0.0001361,
+     0.0002096,
+     0.000281,
+     0.0004981,
+     0.001449,
+     0.004681,
+     0.01312,
+     0.02983,
+     0.05774,
+     0.09596,
+     0.1486,
+     0.211,
+     0.2882,
+     0.3727,
+     0.47,
+     0.5779,
+     0.6897,
+     0.8138,
+     0.9033,
+     0.9937,
+     1.095,
+     1.191,
+     1.299,
+     1.411,
+     1.498,
+     1.549,
+     1.578,
+     1.599,
+     1.628,
+     1.679,
+     1.783,
+     1.882]
+
+# Parameters for encode/LevelScale:
+# ==============================================================================
+encode/LevelScale.keys_to_scale = ['specific_humidity']
+encode/LevelScale.name = None
+encode/LevelScale.scales = \
+    [8.825e-05,
+     7.041e-05,
+     0.0001044,
+     0.0001832,
+     0.0007474,
+     0.002588,
+     0.007067,
+     0.01524,
+     0.02838,
+     0.04518,
+     0.06902,
+     0.09718,
+     0.1316,
+     0.1716,
+     0.2182,
+     0.2748,
+     0.3379,
+     0.4073,
+     0.4611,
+     0.5177,
+     0.5798,
+     0.6547,
+     0.7397,
+     0.8362,
+     0.9373,
+     1.041,
+     1.149,
+     1.265,
+     1.394,
+     1.551,
+     1.71,
+     1.792]
+
+# Parameters for advance/MemoryVelocityAndValues:
+# ==============================================================================
+advance/MemoryVelocityAndValues.fields_to_include = None
+advance/MemoryVelocityAndValues.name = None
+
+# Parameters for decode/MlpUniform:
+# ==============================================================================
+decode/MlpUniform.activate_final = False
+decode/MlpUniform.activation = %ACTIVATION
+decode/MlpUniform.b_init = None
+decode/MlpUniform.b_init_final = None
+decode/MlpUniform.name = None
+decode/MlpUniform.num_hidden_layers = 0
+decode/MlpUniform.num_hidden_units = %LAYER_SIZE
+decode/MlpUniform.w_init = None
+decode/MlpUniform.w_init_final = None
+decode/MlpUniform.with_bias = False
+
+# Parameters for encode/MlpUniform:
+# ==============================================================================
+encode/MlpUniform.activate_final = False
+encode/MlpUniform.activation = %ACTIVATION
+encode/MlpUniform.b_init = None
+encode/MlpUniform.b_init_final = None
+encode/MlpUniform.name = None
+encode/MlpUniform.num_hidden_layers = 0
+encode/MlpUniform.num_hidden_units = 0
+encode/MlpUniform.w_init = None
+encode/MlpUniform.w_init_final = None
+encode/MlpUniform.with_bias = True
+
+# Parameters for process/MlpUniform:
+# ==============================================================================
+process/MlpUniform.activate_final = False
+process/MlpUniform.activation = %ACTIVATION
+process/MlpUniform.b_init = None
+process/MlpUniform.b_init_final = None
+process/MlpUniform.name = None
+process/MlpUniform.num_hidden_layers = 3
+process/MlpUniform.num_hidden_units = %LAYER_SIZE
+process/MlpUniform.w_init = None
+process/MlpUniform.w_init_final = None
+process/MlpUniform.with_bias = True
+
+# Parameters for surface_model_decode/MlpUniform:
+# ==============================================================================
+surface_model_decode/MlpUniform.activate_final = False
+surface_model_decode/MlpUniform.activation = %ACTIVATION
+surface_model_decode/MlpUniform.b_init = None
+surface_model_decode/MlpUniform.b_init_final = None
+surface_model_decode/MlpUniform.name = None
+surface_model_decode/MlpUniform.num_hidden_layers = 1
+surface_model_decode/MlpUniform.num_hidden_units = %SURFACE_MODEL_LAYER_SIZE
+surface_model_decode/MlpUniform.w_init = None
+surface_model_decode/MlpUniform.w_init_final = None
+surface_model_decode/MlpUniform.with_bias = False
+
+# Parameters for surface_model_encode/MlpUniform:
+# ==============================================================================
+surface_model_encode/MlpUniform.activate_final = False
+surface_model_encode/MlpUniform.activation = %ACTIVATION
+surface_model_encode/MlpUniform.b_init = None
+surface_model_encode/MlpUniform.b_init_final = None
+surface_model_encode/MlpUniform.name = None
+surface_model_encode/MlpUniform.num_hidden_layers = 0
+surface_model_encode/MlpUniform.num_hidden_units = 0
+surface_model_encode/MlpUniform.w_init = None
+surface_model_encode/MlpUniform.w_init_final = None
+surface_model_encode/MlpUniform.with_bias = True
+
+# Parameters for surface_model_process/MlpUniform:
+# ==============================================================================
+surface_model_process/MlpUniform.activate_final = False
+surface_model_process/MlpUniform.activation = %ACTIVATION
+surface_model_process/MlpUniform.b_init = None
+surface_model_process/MlpUniform.b_init_final = None
+surface_model_process/MlpUniform.name = None
+surface_model_process/MlpUniform.num_hidden_layers = 3
+surface_model_process/MlpUniform.num_hidden_units = %SURFACE_MODEL_LAYER_SIZE
+surface_model_process/MlpUniform.w_init = None
+surface_model_process/MlpUniform.w_init_final = None
+surface_model_process/MlpUniform.with_bias = True
+
+# Parameters for advance/ModalToNodalEmbedding:
+# ==============================================================================
+advance/ModalToNodalEmbedding.modal_to_nodal_features_module = \
+    @embedding_model/CombinedFeatures
+advance/ModalToNodalEmbedding.name = None
+advance/ModalToNodalEmbedding.nodal_mapping_module = @NodalVolumeMapping
+advance/ModalToNodalEmbedding.output_transform_module = @IdentityTransform
+
+# Parameters for land_model/ModalToNodalEmbedding:
+# ==============================================================================
+land_model/ModalToNodalEmbedding.modal_to_nodal_features_module = \
+    @land_model/CombinedFeatures
+land_model/ModalToNodalEmbedding.name = None
+land_model/ModalToNodalEmbedding.nodal_mapping_module = @land_model/NodalMapping
+land_model/ModalToNodalEmbedding.output_transform_module = @IdentityTransform
+
+# Parameters for sea_ice_model/ModalToNodalEmbedding:
+# ==============================================================================
+sea_ice_model/ModalToNodalEmbedding.modal_to_nodal_features_module = \
+    @sea_ice_model/CombinedFeatures
+sea_ice_model/ModalToNodalEmbedding.name = None
+sea_ice_model/ModalToNodalEmbedding.nodal_mapping_module = \
+    @sea_ice_model/NodalMapping
+sea_ice_model/ModalToNodalEmbedding.output_transform_module = @IdentityTransform
+
+# Parameters for sea_model/ModalToNodalEmbedding:
+# ==============================================================================
+sea_model/ModalToNodalEmbedding.modal_to_nodal_features_module = \
+    @sea_model/CombinedFeatures
+sea_model/ModalToNodalEmbedding.name = None
+sea_model/ModalToNodalEmbedding.nodal_mapping_module = @sea_model/NodalMapping
+sea_model/ModalToNodalEmbedding.output_transform_module = @IdentityTransform
+
+# Parameters for MoistPrimitiveEquationsWithCloudMoisture:
+# ==============================================================================
+MoistPrimitiveEquationsWithCloudMoisture.include_vertical_advection = True
+MoistPrimitiveEquationsWithCloudMoisture.name = None
+MoistPrimitiveEquationsWithCloudMoisture.orography_module = @LearnedOrography
+
+# Parameters for advance/NodalLandSeaIceEmbedding:
+# ==============================================================================
+advance/NodalLandSeaIceEmbedding.land_embedding = @land_model/ModalToNodalEmbedding
+advance/NodalLandSeaIceEmbedding.name = None
+advance/NodalLandSeaIceEmbedding.sea_embedding = @sea_model/ModalToNodalEmbedding
+advance/NodalLandSeaIceEmbedding.sea_ice_embedding = \
+    @sea_ice_model/ModalToNodalEmbedding
+advance/NodalLandSeaIceEmbedding.static_vars_ds_path = None
+
+# Parameters for NodalMapping:
+# ==============================================================================
+NodalMapping.name = None
+NodalMapping.tower_factory = @EpdTower
+
+# Parameters for land_model/NodalMapping:
+# ==============================================================================
+land_model/NodalMapping.name = None
+land_model/NodalMapping.tower_factory = @surface_model/EpdTower
+
+# Parameters for sea_ice_model/NodalMapping:
+# ==============================================================================
+sea_ice_model/NodalMapping.name = None
+sea_ice_model/NodalMapping.tower_factory = @surface_model/EpdTower
+
+# Parameters for sea_model/NodalMapping:
+# ==============================================================================
+sea_model/NodalMapping.name = None
+sea_model/NodalMapping.tower_factory = @surface_model/EpdTower
+
+# Parameters for NodalVolumeMapping:
+# ==============================================================================
+NodalVolumeMapping.name = None
+NodalVolumeMapping.tower_factory = @VerticalConvTower
+
+# Parameters for NullFeatures:
+# ==============================================================================
+NullFeatures.name = None
+
+# Parameters for advance/PressureFeatures:
+# ==============================================================================
+advance/PressureFeatures.name = None
+
+# Parameters for embedding_model/PressureFeatures:
+# ==============================================================================
+embedding_model/PressureFeatures.name = None
+
+# Parameters for primitive_eq_specs_constructor:
+# ==============================================================================
+primitive_eq_specs_constructor.scale = @GET_ATMOSPHERIC_SCALE()
+
+# Parameters for primitive_eq_to_xarray:
+# ==============================================================================
+# None.
+
+# Parameters for PrimitiveToWeatherbenchDecoder:
+# ==============================================================================
+# None.
+
+# Parameters for advance/RadiationFeatures:
+# ==============================================================================
+advance/RadiationFeatures.name = None
+
+# Parameters for decoder_model/RadiationFeatures:
+# ==============================================================================
+decoder_model/RadiationFeatures.name = None
+
+# Parameters for encoder_data/RadiationFeatures:
+# ==============================================================================
+encoder_data/RadiationFeatures.name = None
+
+# Parameters for dycore/SequentialStepFilter:
+# ==============================================================================
+dycore/SequentialStepFilter.filter_modules = \
+    (@dycore/ExponentialFilter, @stability/ExponentialFilter)
+dycore/SequentialStepFilter.name = None
+
+# Parameters for ml/SequentialStepFilter:
+# ==============================================================================
+ml/SequentialStepFilter.filter_modules = (@stability/ExponentialFilter,)
+ml/SequentialStepFilter.name = None
+
+# Parameters for advance/SequentialTransform:
+# ==============================================================================
+advance/SequentialTransform.name = None
+advance/SequentialTransform.transform_modules = \
+    (@advance/ShiftAndNormalize,
+     @advance/InverseLevelScale,
+     @advance/TruncateSigmaLevels,
+     @SoftClip)
+
+# Parameters for decoder/SequentialTransform:
+# ==============================================================================
+decoder/SequentialTransform.name = None
+decoder/SequentialTransform.transform_modules = \
+    (@decoder/InverseShiftAndNormalize, @decoder/LevelScale)
+
+# Parameters for decoder_model/SequentialTransform:
+# ==============================================================================
+decoder_model/SequentialTransform.name = None
+decoder_model/SequentialTransform.transform_modules = \
+    (@decoder_model/ShiftAndNormalize,
+     @decoder_model/InverseLevelScale,
+     @decoder_model/TruncateSigmaLevels)
+
+# Parameters for div_curl_tendency_outputs/SequentialTransform:
+# ==============================================================================
+div_curl_tendency_outputs/SequentialTransform.name = None
+div_curl_tendency_outputs/SequentialTransform.transform_modules = \
+    (@div_curl_tendency_outputs/InverseShiftAndNormalize,
+     @div_curl_tendency_outputs/LevelScale)
+
+# Parameters for encode/SequentialTransform:
+# ==============================================================================
+encode/SequentialTransform.name = None
+encode/SequentialTransform.transform_modules = \
+    (@encoder/InverseShiftAndNormalize, @encode/LevelScale)
+
+# Parameters for encoder_data/SequentialTransform:
+# ==============================================================================
+encoder_data/SequentialTransform.name = None
+encoder_data/SequentialTransform.transform_modules = \
+    (@encoder_data/ShiftAndNormalize, @encoder_data/InverseLevelScale)
+
+# Parameters for advance/ShiftAndNormalize:
+# ==============================================================================
+advance/ShiftAndNormalize.features_to_exclude = ()
+advance/ShiftAndNormalize.global_scale = None
+advance/ShiftAndNormalize.name = None
+advance/ShiftAndNormalize.scales = \
+    {'CNN1D_0': 0.1,
+     'CNN1D_1': 0.1,
+     'CNN1D_10': 0.1,
+     'CNN1D_11': 0.1,
+     'CNN1D_12': 0.1,
+     'CNN1D_13': 0.1,
+     'CNN1D_14': 0.1,
+     'CNN1D_15': 0.1,
+     'CNN1D_16': 0.1,
+     'CNN1D_17': 0.1,
+     'CNN1D_18': 0.1,
+     'CNN1D_19': 0.1,
+     'CNN1D_2': 0.1,
+     'CNN1D_20': 0.1,
+     'CNN1D_21': 0.1,
+     'CNN1D_22': 0.1,
+     'CNN1D_23': 0.1,
+     'CNN1D_24': 0.1,
+     'CNN1D_25': 0.1,
+     'CNN1D_26': 0.1,
+     'CNN1D_27': 0.1,
+     'CNN1D_28': 0.1,
+     'CNN1D_29': 0.1,
+     'CNN1D_3': 0.1,
+     'CNN1D_30': 0.1,
+     'CNN1D_31': 0.1,
+     'CNN1D_32': 0.1,
+     'CNN1D_33': 0.1,
+     'CNN1D_34': 0.1,
+     'CNN1D_35': 0.1,
+     'CNN1D_36': 0.1,
+     'CNN1D_37': 0.1,
+     'CNN1D_38': 0.1,
+     'CNN1D_39': 0.1,
+     'CNN1D_4': 0.1,
+     'CNN1D_40': 0.1,
+     'CNN1D_41': 0.1,
+     'CNN1D_42': 0.1,
+     'CNN1D_43': 0.1,
+     'CNN1D_44': 0.1,
+     'CNN1D_45': 0.1,
+     'CNN1D_46': 0.1,
+     'CNN1D_47': 0.1,
+     'CNN1D_48': 0.1,
+     'CNN1D_49': 0.1,
+     'CNN1D_5': 0.1,
+     'CNN1D_50': 0.1,
+     'CNN1D_51': 0.1,
+     'CNN1D_52': 0.1,
+     'CNN1D_53': 0.1,
+     'CNN1D_54': 0.1,
+     'CNN1D_55': 0.1,
+     'CNN1D_56': 0.1,
+     'CNN1D_57': 0.1,
+     'CNN1D_58': 0.1,
+     'CNN1D_59': 0.1,
+     'CNN1D_6': 0.1,
+     'CNN1D_60': 0.1,
+     'CNN1D_61': 0.1,
+     'CNN1D_62': 0.1,
+     'CNN1D_63': 0.1,
+     'CNN1D_7': 0.1,
+     'CNN1D_8': 0.1,
+     'CNN1D_9': 0.1,
+     'cos_latitude': 0.3036,
+     'divergence': 0.05232,
+     'divergence_del2': 108.7,
+     'divergence_dlat': 2.176,
+     'divergence_dlon': 1.488,
+     'geopotential_at_surface': 0.00926,
+     'geopotential_at_surface_del2': 4.511,
+     'geopotential_at_surface_dlat': 0.1074,
+     'geopotential_at_surface_dlon': 0.08614,
+     'land_sea_mask': 0.4403,
+     'learned_positional_features': 1.0,
+     'log_surface_pressure': 0.1096,
+     'log_surface_pressure_del2': 48.61,
+     'log_surface_pressure_dlat': 1.095,
+     'log_surface_pressure_dlon': 0.9575,
+     'memory_divergence': 0.05232,
+     'memory_log_surface_pressure': 0.1123,
+     'memory_specific_cloud_ice_water_content': 7.845e-06,
+     'memory_specific_cloud_liquid_water_content': 1.648e-05,
+     'memory_specific_humidity': 0.003298,
+     'memory_temperature_variation': 14.73,
+     'memory_u': 0.01472,
+     'memory_v': 0.01001,
+     'memory_vorticity': 0.2168,
+     'pressure': 1.643,
+     'radiation': 0.2867,
+     'sea_ice_cover': 0.387,
+     'sea_surface_temperature': 11.93,
+     'sin_latitude': 0.7043,
+     'specific_cloud_ice_water_content': 7.845e-06,
+     'specific_cloud_ice_water_content_del2': 0.01029,
+     'specific_cloud_ice_water_content_dlat': 0.000203,
+     'specific_cloud_ice_water_content_dlon': 0.0001601,
+     'specific_cloud_liquid_water_content': 1.648e-05,
+     'specific_cloud_liquid_water_content_del2': 0.02065,
+     'specific_cloud_liquid_water_content_dlat': 0.0004055,
+     'specific_cloud_liquid_water_content_dlon': 0.000309,
+     'specific_humidity': 0.003281,
+     'specific_humidity_del2': 0.8403,
+     'specific_humidity_dlat': 0.01955,
+     'specific_humidity_dlon': 0.01361,
+     'surface_embedding': 1.0,
+     'temperature_variation': 14.73,
+     'temperature_variation_del2': 2386.0,
+     'temperature_variation_dlat': 62.26,
+     'temperature_variation_dlon': 50.23,
+     'u': 0.01472,
+     'u_del2': 6.478,
+     'u_dlat': 0.682,
+     'u_dlon': 0.1073,
+     'v': 0.01001,
+     'v_del2': 5.028,
+     'v_dlat': 0.3098,
+     'v_dlon': 0.1431,
+     'vorticity': 0.2168,
+     'vorticity_del2': 290.5,
+     'vorticity_dlat': 5.741,
+     'vorticity_dlon': 4.558}
+advance/ShiftAndNormalize.shifts = \
+    {'CNN1D_0': 0.0,
+     'CNN1D_1': 0.0,
+     'CNN1D_10': 0.0,
+     'CNN1D_11': 0.0,
+     'CNN1D_12': 0.0,
+     'CNN1D_13': 0.0,
+     'CNN1D_14': 0.0,
+     'CNN1D_15': 0.0,
+     'CNN1D_16': 0.0,
+     'CNN1D_17': 0.0,
+     'CNN1D_18': 0.0,
+     'CNN1D_19': 0.0,
+     'CNN1D_2': 0.0,
+     'CNN1D_20': 0.0,
+     'CNN1D_21': 0.0,
+     'CNN1D_22': 0.0,
+     'CNN1D_23': 0.0,
+     'CNN1D_24': 0.0,
+     'CNN1D_25': 0.0,
+     'CNN1D_26': 0.0,
+     'CNN1D_27': 0.0,
+     'CNN1D_28': 0.0,
+     'CNN1D_29': 0.0,
+     'CNN1D_3': 0.0,
+     'CNN1D_30': 0.0,
+     'CNN1D_31': 0.0,
+     'CNN1D_32': 0.0,
+     'CNN1D_33': 0.0,
+     'CNN1D_34': 0.0,
+     'CNN1D_35': 0.0,
+     'CNN1D_36': 0.0,
+     'CNN1D_37': 0.0,
+     'CNN1D_38': 0.0,
+     'CNN1D_39': 0.0,
+     'CNN1D_4': 0.0,
+     'CNN1D_40': 0.0,
+     'CNN1D_41': 0.0,
+     'CNN1D_42': 0.0,
+     'CNN1D_43': 0.0,
+     'CNN1D_44': 0.0,
+     'CNN1D_45': 0.0,
+     'CNN1D_46': 0.0,
+     'CNN1D_47': 0.0,
+     'CNN1D_48': 0.0,
+     'CNN1D_49': 0.0,
+     'CNN1D_5': 0.0,
+     'CNN1D_50': 0.0,
+     'CNN1D_51': 0.0,
+     'CNN1D_52': 0.0,
+     'CNN1D_53': 0.0,
+     'CNN1D_54': 0.0,
+     'CNN1D_55': 0.0,
+     'CNN1D_56': 0.0,
+     'CNN1D_57': 0.0,
+     'CNN1D_58': 0.0,
+     'CNN1D_59': 0.0,
+     'CNN1D_6': 0.0,
+     'CNN1D_60': 0.0,
+     'CNN1D_61': 0.0,
+     'CNN1D_62': 0.0,
+     'CNN1D_63': 0.0,
+     'CNN1D_7': 0.0,
+     'CNN1D_8': 0.0,
+     'CNN1D_9': 0.0,
+     'cos_latitude': 0.642,
+     'divergence': -0.0,
+     'divergence_del2': 0.006,
+     'divergence_dlat': 0.001,
+     'divergence_dlon': -0.0,
+     'geopotential_at_surface': 0.004,
+     'geopotential_at_surface_del2': -0.068,
+     'geopotential_at_surface_dlat': -0.011,
+     'geopotential_at_surface_dlon': -0.0,
+     'land_sea_mask': 0.334,
+     'learned_positional_features': 0.0,
+     'log_surface_pressure': 1.716,
+     'log_surface_pressure_del2': 0.819,
+     'log_surface_pressure_dlat': 0.135,
+     'log_surface_pressure_dlon': 0.0,
+     'memory_divergence': -0.0,
+     'memory_log_surface_pressure': 1.716,
+     'memory_specific_cloud_ice_water_content': 0.0,
+     'memory_specific_cloud_liquid_water_content': 0.0,
+     'memory_specific_humidity': 0.003298,
+     'memory_temperature_variation': -4.946,
+     'memory_u': 0.007,
+     'memory_v': -0.0,
+     'memory_vorticity': -0.002,
+     'pressure': 2.798,
+     'radiation': 0.214,
+     'sea_ice_cover': 0.24,
+     'sea_surface_temperature': 285.14,
+     'sin_latitude': 0.0,
+     'specific_cloud_ice_water_content': 0.0,
+     'specific_cloud_ice_water_content_del2': 0.0,
+     'specific_cloud_ice_water_content_dlat': 0.0,
+     'specific_cloud_ice_water_content_dlon': -0.0,
+     'specific_cloud_liquid_water_content': 0.0,
+     'specific_cloud_liquid_water_content_del2': 0.0,
+     'specific_cloud_liquid_water_content_dlat': 0.0,
+     'specific_cloud_liquid_water_content_dlon': 0.0,
+     'specific_humidity': 0.0,
+     'specific_humidity_del2': 0.0,
+     'specific_humidity_dlat': 0.0,
+     'specific_humidity_dlon': 0.0,
+     'surface_embedding': 0.0,
+     'temperature_variation': -5.126,
+     'temperature_variation_del2': 46.171,
+     'temperature_variation_dlat': 5.054,
+     'temperature_variation_dlon': 0.0,
+     'u': 0.007,
+     'u_del2': 0.147,
+     'u_dlat': 0.002,
+     'u_dlon': 0.0,
+     'v': -0.0,
+     'v_del2': -0.001,
+     'v_dlat': -0.0,
+     'v_dlon': 0.0,
+     'vorticity': -0.002,
+     'vorticity_del2': -0.399,
+     'vorticity_dlat': 0.036,
+     'vorticity_dlon': -0.0}
+
+# Parameters for decoder_model/ShiftAndNormalize:
+# ==============================================================================
+decoder_model/ShiftAndNormalize.features_to_exclude = ()
+decoder_model/ShiftAndNormalize.global_scale = None
+decoder_model/ShiftAndNormalize.name = None
+decoder_model/ShiftAndNormalize.scales = \
+    {'CNN1D_0': 0.1,
+     'CNN1D_1': 0.1,
+     'CNN1D_10': 0.1,
+     'CNN1D_11': 0.1,
+     'CNN1D_12': 0.1,
+     'CNN1D_13': 0.1,
+     'CNN1D_14': 0.1,
+     'CNN1D_15': 0.1,
+     'CNN1D_16': 0.1,
+     'CNN1D_17': 0.1,
+     'CNN1D_18': 0.1,
+     'CNN1D_19': 0.1,
+     'CNN1D_2': 0.1,
+     'CNN1D_20': 0.1,
+     'CNN1D_21': 0.1,
+     'CNN1D_22': 0.1,
+     'CNN1D_23': 0.1,
+     'CNN1D_24': 0.1,
+     'CNN1D_25': 0.1,
+     'CNN1D_26': 0.1,
+     'CNN1D_27': 0.1,
+     'CNN1D_28': 0.1,
+     'CNN1D_29': 0.1,
+     'CNN1D_3': 0.1,
+     'CNN1D_30': 0.1,
+     'CNN1D_31': 0.1,
+     'CNN1D_32': 0.1,
+     'CNN1D_33': 0.1,
+     'CNN1D_34': 0.1,
+     'CNN1D_35': 0.1,
+     'CNN1D_36': 0.1,
+     'CNN1D_37': 0.1,
+     'CNN1D_38': 0.1,
+     'CNN1D_39': 0.1,
+     'CNN1D_4': 0.1,
+     'CNN1D_40': 0.1,
+     'CNN1D_41': 0.1,
+     'CNN1D_42': 0.1,
+     'CNN1D_43': 0.1,
+     'CNN1D_44': 0.1,
+     'CNN1D_45': 0.1,
+     'CNN1D_46': 0.1,
+     'CNN1D_47': 0.1,
+     'CNN1D_48': 0.1,
+     'CNN1D_49': 0.1,
+     'CNN1D_5': 0.1,
+     'CNN1D_50': 0.1,
+     'CNN1D_51': 0.1,
+     'CNN1D_52': 0.1,
+     'CNN1D_53': 0.1,
+     'CNN1D_54': 0.1,
+     'CNN1D_55': 0.1,
+     'CNN1D_56': 0.1,
+     'CNN1D_57': 0.1,
+     'CNN1D_58': 0.1,
+     'CNN1D_59': 0.1,
+     'CNN1D_6': 0.1,
+     'CNN1D_60': 0.1,
+     'CNN1D_61': 0.1,
+     'CNN1D_62': 0.1,
+     'CNN1D_63': 0.1,
+     'CNN1D_7': 0.1,
+     'CNN1D_8': 0.1,
+     'CNN1D_9': 0.1,
+     'cos_latitude': 0.3036,
+     'divergence': 0.05232,
+     'divergence_del2': 108.7,
+     'divergence_dlat': 2.176,
+     'divergence_dlon': 1.488,
+     'geopotential_at_surface': 0.00926,
+     'geopotential_at_surface_del2': 4.511,
+     'geopotential_at_surface_dlat': 0.1074,
+     'geopotential_at_surface_dlon': 0.08614,
+     'land_sea_mask': 0.4403,
+     'learned_positional_features': 1.0,
+     'log_surface_pressure': 0.1096,
+     'log_surface_pressure_del2': 48.61,
+     'log_surface_pressure_dlat': 1.095,
+     'log_surface_pressure_dlon': 0.9575,
+     'memory_divergence': 0.05232,
+     'memory_log_surface_pressure': 0.1123,
+     'memory_specific_cloud_ice_water_content': 7.845e-06,
+     'memory_specific_cloud_liquid_water_content': 1.648e-05,
+     'memory_specific_humidity': 0.003298,
+     'memory_temperature_variation': 14.73,
+     'memory_u': 0.01472,
+     'memory_v': 0.01001,
+     'memory_vorticity': 0.2168,
+     'pressure': 1.643,
+     'radiation': 0.2867,
+     'sea_ice_cover': 0.387,
+     'sea_surface_temperature': 11.93,
+     'sin_latitude': 0.7043,
+     'specific_cloud_ice_water_content': 7.845e-06,
+     'specific_cloud_ice_water_content_del2': 0.01029,
+     'specific_cloud_ice_water_content_dlat': 0.000203,
+     'specific_cloud_ice_water_content_dlon': 0.0001601,
+     'specific_cloud_liquid_water_content': 1.648e-05,
+     'specific_cloud_liquid_water_content_del2': 0.02065,
+     'specific_cloud_liquid_water_content_dlat': 0.0004055,
+     'specific_cloud_liquid_water_content_dlon': 0.000309,
+     'specific_humidity': 0.003281,
+     'specific_humidity_del2': 0.8403,
+     'specific_humidity_dlat': 0.01955,
+     'specific_humidity_dlon': 0.01361,
+     'surface_embedding': 1.0,
+     'temperature_variation': 14.73,
+     'temperature_variation_del2': 2386.0,
+     'temperature_variation_dlat': 62.26,
+     'temperature_variation_dlon': 50.23,
+     'u': 0.01472,
+     'u_del2': 6.478,
+     'u_dlat': 0.682,
+     'u_dlon': 0.1073,
+     'v': 0.01001,
+     'v_del2': 5.028,
+     'v_dlat': 0.3098,
+     'v_dlon': 0.1431,
+     'vorticity': 0.2168,
+     'vorticity_del2': 290.5,
+     'vorticity_dlat': 5.741,
+     'vorticity_dlon': 4.558}
+decoder_model/ShiftAndNormalize.shifts = \
+    {'CNN1D_0': 0.0,
+     'CNN1D_1': 0.0,
+     'CNN1D_10': 0.0,
+     'CNN1D_11': 0.0,
+     'CNN1D_12': 0.0,
+     'CNN1D_13': 0.0,
+     'CNN1D_14': 0.0,
+     'CNN1D_15': 0.0,
+     'CNN1D_16': 0.0,
+     'CNN1D_17': 0.0,
+     'CNN1D_18': 0.0,
+     'CNN1D_19': 0.0,
+     'CNN1D_2': 0.0,
+     'CNN1D_20': 0.0,
+     'CNN1D_21': 0.0,
+     'CNN1D_22': 0.0,
+     'CNN1D_23': 0.0,
+     'CNN1D_24': 0.0,
+     'CNN1D_25': 0.0,
+     'CNN1D_26': 0.0,
+     'CNN1D_27': 0.0,
+     'CNN1D_28': 0.0,
+     'CNN1D_29': 0.0,
+     'CNN1D_3': 0.0,
+     'CNN1D_30': 0.0,
+     'CNN1D_31': 0.0,
+     'CNN1D_32': 0.0,
+     'CNN1D_33': 0.0,
+     'CNN1D_34': 0.0,
+     'CNN1D_35': 0.0,
+     'CNN1D_36': 0.0,
+     'CNN1D_37': 0.0,
+     'CNN1D_38': 0.0,
+     'CNN1D_39': 0.0,
+     'CNN1D_4': 0.0,
+     'CNN1D_40': 0.0,
+     'CNN1D_41': 0.0,
+     'CNN1D_42': 0.0,
+     'CNN1D_43': 0.0,
+     'CNN1D_44': 0.0,
+     'CNN1D_45': 0.0,
+     'CNN1D_46': 0.0,
+     'CNN1D_47': 0.0,
+     'CNN1D_48': 0.0,
+     'CNN1D_49': 0.0,
+     'CNN1D_5': 0.0,
+     'CNN1D_50': 0.0,
+     'CNN1D_51': 0.0,
+     'CNN1D_52': 0.0,
+     'CNN1D_53': 0.0,
+     'CNN1D_54': 0.0,
+     'CNN1D_55': 0.0,
+     'CNN1D_56': 0.0,
+     'CNN1D_57': 0.0,
+     'CNN1D_58': 0.0,
+     'CNN1D_59': 0.0,
+     'CNN1D_6': 0.0,
+     'CNN1D_60': 0.0,
+     'CNN1D_61': 0.0,
+     'CNN1D_62': 0.0,
+     'CNN1D_63': 0.0,
+     'CNN1D_7': 0.0,
+     'CNN1D_8': 0.0,
+     'CNN1D_9': 0.0,
+     'cos_latitude': 0.642,
+     'divergence': -0.0,
+     'divergence_del2': 0.006,
+     'divergence_dlat': 0.001,
+     'divergence_dlon': -0.0,
+     'geopotential_at_surface': 0.004,
+     'geopotential_at_surface_del2': -0.068,
+     'geopotential_at_surface_dlat': -0.011,
+     'geopotential_at_surface_dlon': -0.0,
+     'land_sea_mask': 0.334,
+     'learned_positional_features': 0.0,
+     'log_surface_pressure': 1.716,
+     'log_surface_pressure_del2': 0.819,
+     'log_surface_pressure_dlat': 0.135,
+     'log_surface_pressure_dlon': 0.0,
+     'memory_divergence': -0.0,
+     'memory_log_surface_pressure': 1.716,
+     'memory_specific_cloud_ice_water_content': 0.0,
+     'memory_specific_cloud_liquid_water_content': 0.0,
+     'memory_specific_humidity': 0.003298,
+     'memory_temperature_variation': -4.946,
+     'memory_u': 0.007,
+     'memory_v': -0.0,
+     'memory_vorticity': -0.002,
+     'pressure': 2.798,
+     'radiation': 0.214,
+     'sea_ice_cover': 0.24,
+     'sea_surface_temperature': 285.14,
+     'sin_latitude': 0.0,
+     'specific_cloud_ice_water_content': 0.0,
+     'specific_cloud_ice_water_content_del2': 0.0,
+     'specific_cloud_ice_water_content_dlat': 0.0,
+     'specific_cloud_ice_water_content_dlon': -0.0,
+     'specific_cloud_liquid_water_content': 0.0,
+     'specific_cloud_liquid_water_content_del2': 0.0,
+     'specific_cloud_liquid_water_content_dlat': 0.0,
+     'specific_cloud_liquid_water_content_dlon': 0.0,
+     'specific_humidity': 0.0,
+     'specific_humidity_del2': 0.0,
+     'specific_humidity_dlat': 0.0,
+     'specific_humidity_dlon': 0.0,
+     'surface_embedding': 0.0,
+     'temperature_variation': -5.126,
+     'temperature_variation_del2': 46.171,
+     'temperature_variation_dlat': 5.054,
+     'temperature_variation_dlon': 0.0,
+     'u': 0.007,
+     'u_del2': 0.147,
+     'u_dlat': 0.002,
+     'u_dlon': 0.0,
+     'v': -0.0,
+     'v_del2': -0.001,
+     'v_dlat': -0.0,
+     'v_dlon': 0.0,
+     'vorticity': -0.002,
+     'vorticity_del2': -0.399,
+     'vorticity_dlat': 0.036,
+     'vorticity_dlon': -0.0}
+
+# Parameters for embedding_model/ShiftAndNormalize:
+# ==============================================================================
+embedding_model/ShiftAndNormalize.features_to_exclude = ()
+embedding_model/ShiftAndNormalize.global_scale = None
+embedding_model/ShiftAndNormalize.name = None
+embedding_model/ShiftAndNormalize.scales = \
+    {'CNN1D_0': 0.1,
+     'CNN1D_1': 0.1,
+     'CNN1D_10': 0.1,
+     'CNN1D_11': 0.1,
+     'CNN1D_12': 0.1,
+     'CNN1D_13': 0.1,
+     'CNN1D_14': 0.1,
+     'CNN1D_15': 0.1,
+     'CNN1D_16': 0.1,
+     'CNN1D_17': 0.1,
+     'CNN1D_18': 0.1,
+     'CNN1D_19': 0.1,
+     'CNN1D_2': 0.1,
+     'CNN1D_20': 0.1,
+     'CNN1D_21': 0.1,
+     'CNN1D_22': 0.1,
+     'CNN1D_23': 0.1,
+     'CNN1D_24': 0.1,
+     'CNN1D_25': 0.1,
+     'CNN1D_26': 0.1,
+     'CNN1D_27': 0.1,
+     'CNN1D_28': 0.1,
+     'CNN1D_29': 0.1,
+     'CNN1D_3': 0.1,
+     'CNN1D_30': 0.1,
+     'CNN1D_31': 0.1,
+     'CNN1D_32': 0.1,
+     'CNN1D_33': 0.1,
+     'CNN1D_34': 0.1,
+     'CNN1D_35': 0.1,
+     'CNN1D_36': 0.1,
+     'CNN1D_37': 0.1,
+     'CNN1D_38': 0.1,
+     'CNN1D_39': 0.1,
+     'CNN1D_4': 0.1,
+     'CNN1D_40': 0.1,
+     'CNN1D_41': 0.1,
+     'CNN1D_42': 0.1,
+     'CNN1D_43': 0.1,
+     'CNN1D_44': 0.1,
+     'CNN1D_45': 0.1,
+     'CNN1D_46': 0.1,
+     'CNN1D_47': 0.1,
+     'CNN1D_48': 0.1,
+     'CNN1D_49': 0.1,
+     'CNN1D_5': 0.1,
+     'CNN1D_50': 0.1,
+     'CNN1D_51': 0.1,
+     'CNN1D_52': 0.1,
+     'CNN1D_53': 0.1,
+     'CNN1D_54': 0.1,
+     'CNN1D_55': 0.1,
+     'CNN1D_56': 0.1,
+     'CNN1D_57': 0.1,
+     'CNN1D_58': 0.1,
+     'CNN1D_59': 0.1,
+     'CNN1D_6': 0.1,
+     'CNN1D_60': 0.1,
+     'CNN1D_61': 0.1,
+     'CNN1D_62': 0.1,
+     'CNN1D_63': 0.1,
+     'CNN1D_7': 0.1,
+     'CNN1D_8': 0.1,
+     'CNN1D_9': 0.1,
+     'cos_latitude': 0.3036,
+     'divergence': 0.05232,
+     'divergence_del2': 108.7,
+     'divergence_dlat': 2.176,
+     'divergence_dlon': 1.488,
+     'geopotential_at_surface': 0.00926,
+     'geopotential_at_surface_del2': 4.511,
+     'geopotential_at_surface_dlat': 0.1074,
+     'geopotential_at_surface_dlon': 0.08614,
+     'land_sea_mask': 0.4403,
+     'learned_positional_features': 1.0,
+     'log_surface_pressure': 0.1096,
+     'log_surface_pressure_del2': 48.61,
+     'log_surface_pressure_dlat': 1.095,
+     'log_surface_pressure_dlon': 0.9575,
+     'memory_divergence': 0.05232,
+     'memory_log_surface_pressure': 0.1123,
+     'memory_specific_cloud_ice_water_content': 7.845e-06,
+     'memory_specific_cloud_liquid_water_content': 1.648e-05,
+     'memory_specific_humidity': 0.003298,
+     'memory_temperature_variation': 14.73,
+     'memory_u': 0.01472,
+     'memory_v': 0.01001,
+     'memory_vorticity': 0.2168,
+     'pressure': 1.643,
+     'radiation': 0.2867,
+     'sea_ice_cover': 0.387,
+     'sea_surface_temperature': 11.93,
+     'sin_latitude': 0.7043,
+     'specific_cloud_ice_water_content': 7.845e-06,
+     'specific_cloud_ice_water_content_del2': 0.01029,
+     'specific_cloud_ice_water_content_dlat': 0.000203,
+     'specific_cloud_ice_water_content_dlon': 0.0001601,
+     'specific_cloud_liquid_water_content': 1.648e-05,
+     'specific_cloud_liquid_water_content_del2': 0.02065,
+     'specific_cloud_liquid_water_content_dlat': 0.0004055,
+     'specific_cloud_liquid_water_content_dlon': 0.000309,
+     'specific_humidity': 0.003281,
+     'specific_humidity_del2': 0.8403,
+     'specific_humidity_dlat': 0.01955,
+     'specific_humidity_dlon': 0.01361,
+     'surface_embedding': 1.0,
+     'temperature_variation': 14.73,
+     'temperature_variation_del2': 2386.0,
+     'temperature_variation_dlat': 62.26,
+     'temperature_variation_dlon': 50.23,
+     'u': 0.01472,
+     'u_del2': 6.478,
+     'u_dlat': 0.682,
+     'u_dlon': 0.1073,
+     'v': 0.01001,
+     'v_del2': 5.028,
+     'v_dlat': 0.3098,
+     'v_dlon': 0.1431,
+     'vorticity': 0.2168,
+     'vorticity_del2': 290.5,
+     'vorticity_dlat': 5.741,
+     'vorticity_dlon': 4.558}
+embedding_model/ShiftAndNormalize.shifts = \
+    {'CNN1D_0': 0.0,
+     'CNN1D_1': 0.0,
+     'CNN1D_10': 0.0,
+     'CNN1D_11': 0.0,
+     'CNN1D_12': 0.0,
+     'CNN1D_13': 0.0,
+     'CNN1D_14': 0.0,
+     'CNN1D_15': 0.0,
+     'CNN1D_16': 0.0,
+     'CNN1D_17': 0.0,
+     'CNN1D_18': 0.0,
+     'CNN1D_19': 0.0,
+     'CNN1D_2': 0.0,
+     'CNN1D_20': 0.0,
+     'CNN1D_21': 0.0,
+     'CNN1D_22': 0.0,
+     'CNN1D_23': 0.0,
+     'CNN1D_24': 0.0,
+     'CNN1D_25': 0.0,
+     'CNN1D_26': 0.0,
+     'CNN1D_27': 0.0,
+     'CNN1D_28': 0.0,
+     'CNN1D_29': 0.0,
+     'CNN1D_3': 0.0,
+     'CNN1D_30': 0.0,
+     'CNN1D_31': 0.0,
+     'CNN1D_32': 0.0,
+     'CNN1D_33': 0.0,
+     'CNN1D_34': 0.0,
+     'CNN1D_35': 0.0,
+     'CNN1D_36': 0.0,
+     'CNN1D_37': 0.0,
+     'CNN1D_38': 0.0,
+     'CNN1D_39': 0.0,
+     'CNN1D_4': 0.0,
+     'CNN1D_40': 0.0,
+     'CNN1D_41': 0.0,
+     'CNN1D_42': 0.0,
+     'CNN1D_43': 0.0,
+     'CNN1D_44': 0.0,
+     'CNN1D_45': 0.0,
+     'CNN1D_46': 0.0,
+     'CNN1D_47': 0.0,
+     'CNN1D_48': 0.0,
+     'CNN1D_49': 0.0,
+     'CNN1D_5': 0.0,
+     'CNN1D_50': 0.0,
+     'CNN1D_51': 0.0,
+     'CNN1D_52': 0.0,
+     'CNN1D_53': 0.0,
+     'CNN1D_54': 0.0,
+     'CNN1D_55': 0.0,
+     'CNN1D_56': 0.0,
+     'CNN1D_57': 0.0,
+     'CNN1D_58': 0.0,
+     'CNN1D_59': 0.0,
+     'CNN1D_6': 0.0,
+     'CNN1D_60': 0.0,
+     'CNN1D_61': 0.0,
+     'CNN1D_62': 0.0,
+     'CNN1D_63': 0.0,
+     'CNN1D_7': 0.0,
+     'CNN1D_8': 0.0,
+     'CNN1D_9': 0.0,
+     'cos_latitude': 0.642,
+     'divergence': -0.0,
+     'divergence_del2': 0.006,
+     'divergence_dlat': 0.001,
+     'divergence_dlon': -0.0,
+     'geopotential_at_surface': 0.004,
+     'geopotential_at_surface_del2': -0.068,
+     'geopotential_at_surface_dlat': -0.011,
+     'geopotential_at_surface_dlon': -0.0,
+     'land_sea_mask': 0.334,
+     'learned_positional_features': 0.0,
+     'log_surface_pressure': 1.716,
+     'log_surface_pressure_del2': 0.819,
+     'log_surface_pressure_dlat': 0.135,
+     'log_surface_pressure_dlon': 0.0,
+     'memory_divergence': -0.0,
+     'memory_log_surface_pressure': 1.716,
+     'memory_specific_cloud_ice_water_content': 0.0,
+     'memory_specific_cloud_liquid_water_content': 0.0,
+     'memory_specific_humidity': 0.003298,
+     'memory_temperature_variation': -4.946,
+     'memory_u': 0.007,
+     'memory_v': -0.0,
+     'memory_vorticity': -0.002,
+     'pressure': 2.798,
+     'radiation': 0.214,
+     'sea_ice_cover': 0.24,
+     'sea_surface_temperature': 285.14,
+     'sin_latitude': 0.0,
+     'specific_cloud_ice_water_content': 0.0,
+     'specific_cloud_ice_water_content_del2': 0.0,
+     'specific_cloud_ice_water_content_dlat': 0.0,
+     'specific_cloud_ice_water_content_dlon': -0.0,
+     'specific_cloud_liquid_water_content': 0.0,
+     'specific_cloud_liquid_water_content_del2': 0.0,
+     'specific_cloud_liquid_water_content_dlat': 0.0,
+     'specific_cloud_liquid_water_content_dlon': 0.0,
+     'specific_humidity': 0.0,
+     'specific_humidity_del2': 0.0,
+     'specific_humidity_dlat': 0.0,
+     'specific_humidity_dlon': 0.0,
+     'surface_embedding': 0.0,
+     'temperature_variation': -5.126,
+     'temperature_variation_del2': 46.171,
+     'temperature_variation_dlat': 5.054,
+     'temperature_variation_dlon': 0.0,
+     'u': 0.007,
+     'u_del2': 0.147,
+     'u_dlat': 0.002,
+     'u_dlon': 0.0,
+     'v': -0.0,
+     'v_del2': -0.001,
+     'v_dlat': -0.0,
+     'v_dlon': 0.0,
+     'vorticity': -0.002,
+     'vorticity_del2': -0.399,
+     'vorticity_dlat': 0.036,
+     'vorticity_dlon': -0.0}
+
+# Parameters for encoder_data/ShiftAndNormalize:
+# ==============================================================================
+encoder_data/ShiftAndNormalize.features_to_exclude = ()
+encoder_data/ShiftAndNormalize.global_scale = None
+encoder_data/ShiftAndNormalize.name = None
+encoder_data/ShiftAndNormalize.scales = \
+    {'cos_latitude': 0.3036,
+     'geopotential_at_surface': 0.00926,
+     'geopotential_at_surface_del2': 4.511,
+     'geopotential_at_surface_dlat': 0.1074,
+     'geopotential_at_surface_dlon': 0.08614,
+     'land_sea_mask': 0.4403,
+     'learned_positional_features': 1.0,
+     'radiation': 0.2867,
+     'sin_latitude': 0.7043,
+     'specific_cloud_ice_water_content': 6.483e-06,
+     'specific_cloud_ice_water_content_del2': 0.008699,
+     'specific_cloud_ice_water_content_dlat': 0.0001996,
+     'specific_cloud_ice_water_content_dlon': 0.0001299,
+     'specific_cloud_liquid_water_content': 1.706e-05,
+     'specific_cloud_liquid_water_content_del2': 0.02237,
+     'specific_cloud_liquid_water_content_dlat': 0.0005234,
+     'specific_cloud_liquid_water_content_dlon': 0.0003232,
+     'specific_humidity': 0.003474,
+     'specific_humidity_del2': 0.8351,
+     'specific_humidity_dlat': 0.0224,
+     'specific_humidity_dlon': 0.01323,
+     't': 28.0,
+     't_del2': 1795.0,
+     't_dlat': 52.11,
+     't_dlon': 38.9,
+     'u': 0.01924,
+     'u_del2': 5.206,
+     'u_dlat': 0.1515,
+     'u_dlon': 0.09435,
+     'v': 0.0102,
+     'v_del2': 5.058,
+     'v_dlat': 0.08895,
+     'v_dlon': 0.1268,
+     'z': 0.1496,
+     'z_del2': 0.1961,
+     'z_dlat': 0.01578,
+     'z_dlon': 0.008513}
+encoder_data/ShiftAndNormalize.shifts = \
+    {'cos_latitude': 0.642,
+     'geopotential_at_surface': 0.004,
+     'geopotential_at_surface_del2': -0.068,
+     'geopotential_at_surface_dlat': -0.011,
+     'geopotential_at_surface_dlon': -0.0,
+     'land_sea_mask': 0.334,
+     'learned_positional_features': 0.0,
+     'radiation': 0.214,
+     'sin_latitude': 0.0,
+     'specific_cloud_ice_water_content': 0.0,
+     'specific_cloud_ice_water_content_del2': 0.0,
+     'specific_cloud_ice_water_content_dlat': 0.0,
+     'specific_cloud_ice_water_content_dlon': 0.0,
+     'specific_cloud_liquid_water_content': 0.0,
+     'specific_cloud_liquid_water_content_del2': 0.0,
+     'specific_cloud_liquid_water_content_dlat': 0.0,
+     'specific_cloud_liquid_water_content_dlon': 0.0,
+     'specific_humidity': 0.0,
+     'specific_humidity_del2': 0.0,
+     'specific_humidity_dlat': 0.0,
+     'specific_humidity_dlon': 0.0,
+     't': 247.123,
+     't_del2': 31.568,
+     't_dlat': 1.729,
+     't_dlon': 0.0,
+     'u': 0.007,
+     'u_del2': 0.04,
+     'u_dlat': 0.0,
+     'u_dlon': -0.0,
+     'v': 0.0,
+     'v_del2': -0.003,
+     'v_dlat': -0.0,
+     'v_dlon': -0.0,
+     'z': 0.145,
+     'z_del2': 0.011,
+     'z_dlat': 0.001,
+     'z_dlon': 0.0}
+
+# Parameters for land_model/ShiftAndNormalize:
+# ==============================================================================
+land_model/ShiftAndNormalize.features_to_exclude = ()
+land_model/ShiftAndNormalize.global_scale = None
+land_model/ShiftAndNormalize.name = None
+land_model/ShiftAndNormalize.scales = \
+    {'CNN1D_0': 0.1,
+     'CNN1D_1': 0.1,
+     'CNN1D_10': 0.1,
+     'CNN1D_11': 0.1,
+     'CNN1D_12': 0.1,
+     'CNN1D_13': 0.1,
+     'CNN1D_14': 0.1,
+     'CNN1D_15': 0.1,
+     'CNN1D_16': 0.1,
+     'CNN1D_17': 0.1,
+     'CNN1D_18': 0.1,
+     'CNN1D_19': 0.1,
+     'CNN1D_2': 0.1,
+     'CNN1D_20': 0.1,
+     'CNN1D_21': 0.1,
+     'CNN1D_22': 0.1,
+     'CNN1D_23': 0.1,
+     'CNN1D_24': 0.1,
+     'CNN1D_25': 0.1,
+     'CNN1D_26': 0.1,
+     'CNN1D_27': 0.1,
+     'CNN1D_28': 0.1,
+     'CNN1D_29': 0.1,
+     'CNN1D_3': 0.1,
+     'CNN1D_30': 0.1,
+     'CNN1D_31': 0.1,
+     'CNN1D_32': 0.1,
+     'CNN1D_33': 0.1,
+     'CNN1D_34': 0.1,
+     'CNN1D_35': 0.1,
+     'CNN1D_36': 0.1,
+     'CNN1D_37': 0.1,
+     'CNN1D_38': 0.1,
+     'CNN1D_39': 0.1,
+     'CNN1D_4': 0.1,
+     'CNN1D_40': 0.1,
+     'CNN1D_41': 0.1,
+     'CNN1D_42': 0.1,
+     'CNN1D_43': 0.1,
+     'CNN1D_44': 0.1,
+     'CNN1D_45': 0.1,
+     'CNN1D_46': 0.1,
+     'CNN1D_47': 0.1,
+     'CNN1D_48': 0.1,
+     'CNN1D_49': 0.1,
+     'CNN1D_5': 0.1,
+     'CNN1D_50': 0.1,
+     'CNN1D_51': 0.1,
+     'CNN1D_52': 0.1,
+     'CNN1D_53': 0.1,
+     'CNN1D_54': 0.1,
+     'CNN1D_55': 0.1,
+     'CNN1D_56': 0.1,
+     'CNN1D_57': 0.1,
+     'CNN1D_58': 0.1,
+     'CNN1D_59': 0.1,
+     'CNN1D_6': 0.1,
+     'CNN1D_60': 0.1,
+     'CNN1D_61': 0.1,
+     'CNN1D_62': 0.1,
+     'CNN1D_63': 0.1,
+     'CNN1D_7': 0.1,
+     'CNN1D_8': 0.1,
+     'CNN1D_9': 0.1,
+     'cos_latitude': 0.3036,
+     'divergence': 0.05232,
+     'divergence_del2': 108.7,
+     'divergence_dlat': 2.176,
+     'divergence_dlon': 1.488,
+     'geopotential_at_surface': 0.00926,
+     'geopotential_at_surface_del2': 4.511,
+     'geopotential_at_surface_dlat': 0.1074,
+     'geopotential_at_surface_dlon': 0.08614,
+     'land_sea_mask': 0.4403,
+     'learned_positional_features': 1.0,
+     'log_surface_pressure': 0.1096,
+     'log_surface_pressure_del2': 48.61,
+     'log_surface_pressure_dlat': 1.095,
+     'log_surface_pressure_dlon': 0.9575,
+     'memory_divergence': 0.05232,
+     'memory_log_surface_pressure': 0.1123,
+     'memory_specific_cloud_ice_water_content': 7.845e-06,
+     'memory_specific_cloud_liquid_water_content': 1.648e-05,
+     'memory_specific_humidity': 0.003298,
+     'memory_temperature_variation': 14.73,
+     'memory_u': 0.01472,
+     'memory_v': 0.01001,
+     'memory_vorticity': 0.2168,
+     'pressure': 1.643,
+     'radiation': 0.2867,
+     'sea_ice_cover': 0.387,
+     'sea_surface_temperature': 11.93,
+     'sin_latitude': 0.7043,
+     'specific_cloud_ice_water_content': 7.845e-06,
+     'specific_cloud_ice_water_content_del2': 0.01029,
+     'specific_cloud_ice_water_content_dlat': 0.000203,
+     'specific_cloud_ice_water_content_dlon': 0.0001601,
+     'specific_cloud_liquid_water_content': 1.648e-05,
+     'specific_cloud_liquid_water_content_del2': 0.02065,
+     'specific_cloud_liquid_water_content_dlat': 0.0004055,
+     'specific_cloud_liquid_water_content_dlon': 0.000309,
+     'specific_humidity': 0.003281,
+     'specific_humidity_del2': 0.8403,
+     'specific_humidity_dlat': 0.01955,
+     'specific_humidity_dlon': 0.01361,
+     'surface_embedding': 1.0,
+     'temperature_variation': 14.73,
+     'temperature_variation_del2': 2386.0,
+     'temperature_variation_dlat': 62.26,
+     'temperature_variation_dlon': 50.23,
+     'u': 0.01472,
+     'u_del2': 6.478,
+     'u_dlat': 0.682,
+     'u_dlon': 0.1073,
+     'v': 0.01001,
+     'v_del2': 5.028,
+     'v_dlat': 0.3098,
+     'v_dlon': 0.1431,
+     'vorticity': 0.2168,
+     'vorticity_del2': 290.5,
+     'vorticity_dlat': 5.741,
+     'vorticity_dlon': 4.558}
+land_model/ShiftAndNormalize.shifts = \
+    {'CNN1D_0': 0.0,
+     'CNN1D_1': 0.0,
+     'CNN1D_10': 0.0,
+     'CNN1D_11': 0.0,
+     'CNN1D_12': 0.0,
+     'CNN1D_13': 0.0,
+     'CNN1D_14': 0.0,
+     'CNN1D_15': 0.0,
+     'CNN1D_16': 0.0,
+     'CNN1D_17': 0.0,
+     'CNN1D_18': 0.0,
+     'CNN1D_19': 0.0,
+     'CNN1D_2': 0.0,
+     'CNN1D_20': 0.0,
+     'CNN1D_21': 0.0,
+     'CNN1D_22': 0.0,
+     'CNN1D_23': 0.0,
+     'CNN1D_24': 0.0,
+     'CNN1D_25': 0.0,
+     'CNN1D_26': 0.0,
+     'CNN1D_27': 0.0,
+     'CNN1D_28': 0.0,
+     'CNN1D_29': 0.0,
+     'CNN1D_3': 0.0,
+     'CNN1D_30': 0.0,
+     'CNN1D_31': 0.0,
+     'CNN1D_32': 0.0,
+     'CNN1D_33': 0.0,
+     'CNN1D_34': 0.0,
+     'CNN1D_35': 0.0,
+     'CNN1D_36': 0.0,
+     'CNN1D_37': 0.0,
+     'CNN1D_38': 0.0,
+     'CNN1D_39': 0.0,
+     'CNN1D_4': 0.0,
+     'CNN1D_40': 0.0,
+     'CNN1D_41': 0.0,
+     'CNN1D_42': 0.0,
+     'CNN1D_43': 0.0,
+     'CNN1D_44': 0.0,
+     'CNN1D_45': 0.0,
+     'CNN1D_46': 0.0,
+     'CNN1D_47': 0.0,
+     'CNN1D_48': 0.0,
+     'CNN1D_49': 0.0,
+     'CNN1D_5': 0.0,
+     'CNN1D_50': 0.0,
+     'CNN1D_51': 0.0,
+     'CNN1D_52': 0.0,
+     'CNN1D_53': 0.0,
+     'CNN1D_54': 0.0,
+     'CNN1D_55': 0.0,
+     'CNN1D_56': 0.0,
+     'CNN1D_57': 0.0,
+     'CNN1D_58': 0.0,
+     'CNN1D_59': 0.0,
+     'CNN1D_6': 0.0,
+     'CNN1D_60': 0.0,
+     'CNN1D_61': 0.0,
+     'CNN1D_62': 0.0,
+     'CNN1D_63': 0.0,
+     'CNN1D_7': 0.0,
+     'CNN1D_8': 0.0,
+     'CNN1D_9': 0.0,
+     'cos_latitude': 0.642,
+     'divergence': -0.0,
+     'divergence_del2': 0.006,
+     'divergence_dlat': 0.001,
+     'divergence_dlon': -0.0,
+     'geopotential_at_surface': 0.004,
+     'geopotential_at_surface_del2': -0.068,
+     'geopotential_at_surface_dlat': -0.011,
+     'geopotential_at_surface_dlon': -0.0,
+     'land_sea_mask': 0.334,
+     'learned_positional_features': 0.0,
+     'log_surface_pressure': 1.716,
+     'log_surface_pressure_del2': 0.819,
+     'log_surface_pressure_dlat': 0.135,
+     'log_surface_pressure_dlon': 0.0,
+     'memory_divergence': -0.0,
+     'memory_log_surface_pressure': 1.716,
+     'memory_specific_cloud_ice_water_content': 0.0,
+     'memory_specific_cloud_liquid_water_content': 0.0,
+     'memory_specific_humidity': 0.003298,
+     'memory_temperature_variation': -4.946,
+     'memory_u': 0.007,
+     'memory_v': -0.0,
+     'memory_vorticity': -0.002,
+     'pressure': 2.798,
+     'radiation': 0.214,
+     'sea_ice_cover': 0.24,
+     'sea_surface_temperature': 285.14,
+     'sin_latitude': 0.0,
+     'specific_cloud_ice_water_content': 0.0,
+     'specific_cloud_ice_water_content_del2': 0.0,
+     'specific_cloud_ice_water_content_dlat': 0.0,
+     'specific_cloud_ice_water_content_dlon': -0.0,
+     'specific_cloud_liquid_water_content': 0.0,
+     'specific_cloud_liquid_water_content_del2': 0.0,
+     'specific_cloud_liquid_water_content_dlat': 0.0,
+     'specific_cloud_liquid_water_content_dlon': 0.0,
+     'specific_humidity': 0.0,
+     'specific_humidity_del2': 0.0,
+     'specific_humidity_dlat': 0.0,
+     'specific_humidity_dlon': 0.0,
+     'surface_embedding': 0.0,
+     'temperature_variation': -5.126,
+     'temperature_variation_del2': 46.171,
+     'temperature_variation_dlat': 5.054,
+     'temperature_variation_dlon': 0.0,
+     'u': 0.007,
+     'u_del2': 0.147,
+     'u_dlat': 0.002,
+     'u_dlon': 0.0,
+     'v': -0.0,
+     'v_del2': -0.001,
+     'v_dlat': -0.0,
+     'v_dlon': 0.0,
+     'vorticity': -0.002,
+     'vorticity_del2': -0.399,
+     'vorticity_dlat': 0.036,
+     'vorticity_dlon': -0.0}
+
+# Parameters for sea_ice_model/ShiftAndNormalize:
+# ==============================================================================
+sea_ice_model/ShiftAndNormalize.features_to_exclude = ()
+sea_ice_model/ShiftAndNormalize.global_scale = None
+sea_ice_model/ShiftAndNormalize.name = None
+sea_ice_model/ShiftAndNormalize.scales = \
+    {'CNN1D_0': 0.1,
+     'CNN1D_1': 0.1,
+     'CNN1D_10': 0.1,
+     'CNN1D_11': 0.1,
+     'CNN1D_12': 0.1,
+     'CNN1D_13': 0.1,
+     'CNN1D_14': 0.1,
+     'CNN1D_15': 0.1,
+     'CNN1D_16': 0.1,
+     'CNN1D_17': 0.1,
+     'CNN1D_18': 0.1,
+     'CNN1D_19': 0.1,
+     'CNN1D_2': 0.1,
+     'CNN1D_20': 0.1,
+     'CNN1D_21': 0.1,
+     'CNN1D_22': 0.1,
+     'CNN1D_23': 0.1,
+     'CNN1D_24': 0.1,
+     'CNN1D_25': 0.1,
+     'CNN1D_26': 0.1,
+     'CNN1D_27': 0.1,
+     'CNN1D_28': 0.1,
+     'CNN1D_29': 0.1,
+     'CNN1D_3': 0.1,
+     'CNN1D_30': 0.1,
+     'CNN1D_31': 0.1,
+     'CNN1D_32': 0.1,
+     'CNN1D_33': 0.1,
+     'CNN1D_34': 0.1,
+     'CNN1D_35': 0.1,
+     'CNN1D_36': 0.1,
+     'CNN1D_37': 0.1,
+     'CNN1D_38': 0.1,
+     'CNN1D_39': 0.1,
+     'CNN1D_4': 0.1,
+     'CNN1D_40': 0.1,
+     'CNN1D_41': 0.1,
+     'CNN1D_42': 0.1,
+     'CNN1D_43': 0.1,
+     'CNN1D_44': 0.1,
+     'CNN1D_45': 0.1,
+     'CNN1D_46': 0.1,
+     'CNN1D_47': 0.1,
+     'CNN1D_48': 0.1,
+     'CNN1D_49': 0.1,
+     'CNN1D_5': 0.1,
+     'CNN1D_50': 0.1,
+     'CNN1D_51': 0.1,
+     'CNN1D_52': 0.1,
+     'CNN1D_53': 0.1,
+     'CNN1D_54': 0.1,
+     'CNN1D_55': 0.1,
+     'CNN1D_56': 0.1,
+     'CNN1D_57': 0.1,
+     'CNN1D_58': 0.1,
+     'CNN1D_59': 0.1,
+     'CNN1D_6': 0.1,
+     'CNN1D_60': 0.1,
+     'CNN1D_61': 0.1,
+     'CNN1D_62': 0.1,
+     'CNN1D_63': 0.1,
+     'CNN1D_7': 0.1,
+     'CNN1D_8': 0.1,
+     'CNN1D_9': 0.1,
+     'cos_latitude': 0.3036,
+     'divergence': 0.05232,
+     'divergence_del2': 108.7,
+     'divergence_dlat': 2.176,
+     'divergence_dlon': 1.488,
+     'geopotential_at_surface': 0.00926,
+     'geopotential_at_surface_del2': 4.511,
+     'geopotential_at_surface_dlat': 0.1074,
+     'geopotential_at_surface_dlon': 0.08614,
+     'land_sea_mask': 0.4403,
+     'learned_positional_features': 1.0,
+     'log_surface_pressure': 0.1096,
+     'log_surface_pressure_del2': 48.61,
+     'log_surface_pressure_dlat': 1.095,
+     'log_surface_pressure_dlon': 0.9575,
+     'memory_divergence': 0.05232,
+     'memory_log_surface_pressure': 0.1123,
+     'memory_specific_cloud_ice_water_content': 7.845e-06,
+     'memory_specific_cloud_liquid_water_content': 1.648e-05,
+     'memory_specific_humidity': 0.003298,
+     'memory_temperature_variation': 14.73,
+     'memory_u': 0.01472,
+     'memory_v': 0.01001,
+     'memory_vorticity': 0.2168,
+     'pressure': 1.643,
+     'radiation': 0.2867,
+     'sea_ice_cover': 0.387,
+     'sea_surface_temperature': 11.93,
+     'sin_latitude': 0.7043,
+     'specific_cloud_ice_water_content': 7.845e-06,
+     'specific_cloud_ice_water_content_del2': 0.01029,
+     'specific_cloud_ice_water_content_dlat': 0.000203,
+     'specific_cloud_ice_water_content_dlon': 0.0001601,
+     'specific_cloud_liquid_water_content': 1.648e-05,
+     'specific_cloud_liquid_water_content_del2': 0.02065,
+     'specific_cloud_liquid_water_content_dlat': 0.0004055,
+     'specific_cloud_liquid_water_content_dlon': 0.000309,
+     'specific_humidity': 0.003281,
+     'specific_humidity_del2': 0.8403,
+     'specific_humidity_dlat': 0.01955,
+     'specific_humidity_dlon': 0.01361,
+     'surface_embedding': 1.0,
+     'temperature_variation': 14.73,
+     'temperature_variation_del2': 2386.0,
+     'temperature_variation_dlat': 62.26,
+     'temperature_variation_dlon': 50.23,
+     'u': 0.01472,
+     'u_del2': 6.478,
+     'u_dlat': 0.682,
+     'u_dlon': 0.1073,
+     'v': 0.01001,
+     'v_del2': 5.028,
+     'v_dlat': 0.3098,
+     'v_dlon': 0.1431,
+     'vorticity': 0.2168,
+     'vorticity_del2': 290.5,
+     'vorticity_dlat': 5.741,
+     'vorticity_dlon': 4.558}
+sea_ice_model/ShiftAndNormalize.shifts = \
+    {'CNN1D_0': 0.0,
+     'CNN1D_1': 0.0,
+     'CNN1D_10': 0.0,
+     'CNN1D_11': 0.0,
+     'CNN1D_12': 0.0,
+     'CNN1D_13': 0.0,
+     'CNN1D_14': 0.0,
+     'CNN1D_15': 0.0,
+     'CNN1D_16': 0.0,
+     'CNN1D_17': 0.0,
+     'CNN1D_18': 0.0,
+     'CNN1D_19': 0.0,
+     'CNN1D_2': 0.0,
+     'CNN1D_20': 0.0,
+     'CNN1D_21': 0.0,
+     'CNN1D_22': 0.0,
+     'CNN1D_23': 0.0,
+     'CNN1D_24': 0.0,
+     'CNN1D_25': 0.0,
+     'CNN1D_26': 0.0,
+     'CNN1D_27': 0.0,
+     'CNN1D_28': 0.0,
+     'CNN1D_29': 0.0,
+     'CNN1D_3': 0.0,
+     'CNN1D_30': 0.0,
+     'CNN1D_31': 0.0,
+     'CNN1D_32': 0.0,
+     'CNN1D_33': 0.0,
+     'CNN1D_34': 0.0,
+     'CNN1D_35': 0.0,
+     'CNN1D_36': 0.0,
+     'CNN1D_37': 0.0,
+     'CNN1D_38': 0.0,
+     'CNN1D_39': 0.0,
+     'CNN1D_4': 0.0,
+     'CNN1D_40': 0.0,
+     'CNN1D_41': 0.0,
+     'CNN1D_42': 0.0,
+     'CNN1D_43': 0.0,
+     'CNN1D_44': 0.0,
+     'CNN1D_45': 0.0,
+     'CNN1D_46': 0.0,
+     'CNN1D_47': 0.0,
+     'CNN1D_48': 0.0,
+     'CNN1D_49': 0.0,
+     'CNN1D_5': 0.0,
+     'CNN1D_50': 0.0,
+     'CNN1D_51': 0.0,
+     'CNN1D_52': 0.0,
+     'CNN1D_53': 0.0,
+     'CNN1D_54': 0.0,
+     'CNN1D_55': 0.0,
+     'CNN1D_56': 0.0,
+     'CNN1D_57': 0.0,
+     'CNN1D_58': 0.0,
+     'CNN1D_59': 0.0,
+     'CNN1D_6': 0.0,
+     'CNN1D_60': 0.0,
+     'CNN1D_61': 0.0,
+     'CNN1D_62': 0.0,
+     'CNN1D_63': 0.0,
+     'CNN1D_7': 0.0,
+     'CNN1D_8': 0.0,
+     'CNN1D_9': 0.0,
+     'cos_latitude': 0.642,
+     'divergence': -0.0,
+     'divergence_del2': 0.006,
+     'divergence_dlat': 0.001,
+     'divergence_dlon': -0.0,
+     'geopotential_at_surface': 0.004,
+     'geopotential_at_surface_del2': -0.068,
+     'geopotential_at_surface_dlat': -0.011,
+     'geopotential_at_surface_dlon': -0.0,
+     'land_sea_mask': 0.334,
+     'learned_positional_features': 0.0,
+     'log_surface_pressure': 1.716,
+     'log_surface_pressure_del2': 0.819,
+     'log_surface_pressure_dlat': 0.135,
+     'log_surface_pressure_dlon': 0.0,
+     'memory_divergence': -0.0,
+     'memory_log_surface_pressure': 1.716,
+     'memory_specific_cloud_ice_water_content': 0.0,
+     'memory_specific_cloud_liquid_water_content': 0.0,
+     'memory_specific_humidity': 0.003298,
+     'memory_temperature_variation': -4.946,
+     'memory_u': 0.007,
+     'memory_v': -0.0,
+     'memory_vorticity': -0.002,
+     'pressure': 2.798,
+     'radiation': 0.214,
+     'sea_ice_cover': 0.24,
+     'sea_surface_temperature': 285.14,
+     'sin_latitude': 0.0,
+     'specific_cloud_ice_water_content': 0.0,
+     'specific_cloud_ice_water_content_del2': 0.0,
+     'specific_cloud_ice_water_content_dlat': 0.0,
+     'specific_cloud_ice_water_content_dlon': -0.0,
+     'specific_cloud_liquid_water_content': 0.0,
+     'specific_cloud_liquid_water_content_del2': 0.0,
+     'specific_cloud_liquid_water_content_dlat': 0.0,
+     'specific_cloud_liquid_water_content_dlon': 0.0,
+     'specific_humidity': 0.0,
+     'specific_humidity_del2': 0.0,
+     'specific_humidity_dlat': 0.0,
+     'specific_humidity_dlon': 0.0,
+     'surface_embedding': 0.0,
+     'temperature_variation': -5.126,
+     'temperature_variation_del2': 46.171,
+     'temperature_variation_dlat': 5.054,
+     'temperature_variation_dlon': 0.0,
+     'u': 0.007,
+     'u_del2': 0.147,
+     'u_dlat': 0.002,
+     'u_dlon': 0.0,
+     'v': -0.0,
+     'v_del2': -0.001,
+     'v_dlat': -0.0,
+     'v_dlon': 0.0,
+     'vorticity': -0.002,
+     'vorticity_del2': -0.399,
+     'vorticity_dlat': 0.036,
+     'vorticity_dlon': -0.0}
+
+# Parameters for sea_model/ShiftAndNormalize:
+# ==============================================================================
+sea_model/ShiftAndNormalize.features_to_exclude = ()
+sea_model/ShiftAndNormalize.global_scale = None
+sea_model/ShiftAndNormalize.name = None
+sea_model/ShiftAndNormalize.scales = \
+    {'CNN1D_0': 0.1,
+     'CNN1D_1': 0.1,
+     'CNN1D_10': 0.1,
+     'CNN1D_11': 0.1,
+     'CNN1D_12': 0.1,
+     'CNN1D_13': 0.1,
+     'CNN1D_14': 0.1,
+     'CNN1D_15': 0.1,
+     'CNN1D_16': 0.1,
+     'CNN1D_17': 0.1,
+     'CNN1D_18': 0.1,
+     'CNN1D_19': 0.1,
+     'CNN1D_2': 0.1,
+     'CNN1D_20': 0.1,
+     'CNN1D_21': 0.1,
+     'CNN1D_22': 0.1,
+     'CNN1D_23': 0.1,
+     'CNN1D_24': 0.1,
+     'CNN1D_25': 0.1,
+     'CNN1D_26': 0.1,
+     'CNN1D_27': 0.1,
+     'CNN1D_28': 0.1,
+     'CNN1D_29': 0.1,
+     'CNN1D_3': 0.1,
+     'CNN1D_30': 0.1,
+     'CNN1D_31': 0.1,
+     'CNN1D_32': 0.1,
+     'CNN1D_33': 0.1,
+     'CNN1D_34': 0.1,
+     'CNN1D_35': 0.1,
+     'CNN1D_36': 0.1,
+     'CNN1D_37': 0.1,
+     'CNN1D_38': 0.1,
+     'CNN1D_39': 0.1,
+     'CNN1D_4': 0.1,
+     'CNN1D_40': 0.1,
+     'CNN1D_41': 0.1,
+     'CNN1D_42': 0.1,
+     'CNN1D_43': 0.1,
+     'CNN1D_44': 0.1,
+     'CNN1D_45': 0.1,
+     'CNN1D_46': 0.1,
+     'CNN1D_47': 0.1,
+     'CNN1D_48': 0.1,
+     'CNN1D_49': 0.1,
+     'CNN1D_5': 0.1,
+     'CNN1D_50': 0.1,
+     'CNN1D_51': 0.1,
+     'CNN1D_52': 0.1,
+     'CNN1D_53': 0.1,
+     'CNN1D_54': 0.1,
+     'CNN1D_55': 0.1,
+     'CNN1D_56': 0.1,
+     'CNN1D_57': 0.1,
+     'CNN1D_58': 0.1,
+     'CNN1D_59': 0.1,
+     'CNN1D_6': 0.1,
+     'CNN1D_60': 0.1,
+     'CNN1D_61': 0.1,
+     'CNN1D_62': 0.1,
+     'CNN1D_63': 0.1,
+     'CNN1D_7': 0.1,
+     'CNN1D_8': 0.1,
+     'CNN1D_9': 0.1,
+     'cos_latitude': 0.3036,
+     'divergence': 0.05232,
+     'divergence_del2': 108.7,
+     'divergence_dlat': 2.176,
+     'divergence_dlon': 1.488,
+     'geopotential_at_surface': 0.00926,
+     'geopotential_at_surface_del2': 4.511,
+     'geopotential_at_surface_dlat': 0.1074,
+     'geopotential_at_surface_dlon': 0.08614,
+     'land_sea_mask': 0.4403,
+     'learned_positional_features': 1.0,
+     'log_surface_pressure': 0.1096,
+     'log_surface_pressure_del2': 48.61,
+     'log_surface_pressure_dlat': 1.095,
+     'log_surface_pressure_dlon': 0.9575,
+     'memory_divergence': 0.05232,
+     'memory_log_surface_pressure': 0.1123,
+     'memory_specific_cloud_ice_water_content': 7.845e-06,
+     'memory_specific_cloud_liquid_water_content': 1.648e-05,
+     'memory_specific_humidity': 0.003298,
+     'memory_temperature_variation': 14.73,
+     'memory_u': 0.01472,
+     'memory_v': 0.01001,
+     'memory_vorticity': 0.2168,
+     'pressure': 1.643,
+     'radiation': 0.2867,
+     'sea_ice_cover': 0.387,
+     'sea_surface_temperature': 11.93,
+     'sin_latitude': 0.7043,
+     'specific_cloud_ice_water_content': 7.845e-06,
+     'specific_cloud_ice_water_content_del2': 0.01029,
+     'specific_cloud_ice_water_content_dlat': 0.000203,
+     'specific_cloud_ice_water_content_dlon': 0.0001601,
+     'specific_cloud_liquid_water_content': 1.648e-05,
+     'specific_cloud_liquid_water_content_del2': 0.02065,
+     'specific_cloud_liquid_water_content_dlat': 0.0004055,
+     'specific_cloud_liquid_water_content_dlon': 0.000309,
+     'specific_humidity': 0.003281,
+     'specific_humidity_del2': 0.8403,
+     'specific_humidity_dlat': 0.01955,
+     'specific_humidity_dlon': 0.01361,
+     'surface_embedding': 1.0,
+     'temperature_variation': 14.73,
+     'temperature_variation_del2': 2386.0,
+     'temperature_variation_dlat': 62.26,
+     'temperature_variation_dlon': 50.23,
+     'u': 0.01472,
+     'u_del2': 6.478,
+     'u_dlat': 0.682,
+     'u_dlon': 0.1073,
+     'v': 0.01001,
+     'v_del2': 5.028,
+     'v_dlat': 0.3098,
+     'v_dlon': 0.1431,
+     'vorticity': 0.2168,
+     'vorticity_del2': 290.5,
+     'vorticity_dlat': 5.741,
+     'vorticity_dlon': 4.558}
+sea_model/ShiftAndNormalize.shifts = \
+    {'CNN1D_0': 0.0,
+     'CNN1D_1': 0.0,
+     'CNN1D_10': 0.0,
+     'CNN1D_11': 0.0,
+     'CNN1D_12': 0.0,
+     'CNN1D_13': 0.0,
+     'CNN1D_14': 0.0,
+     'CNN1D_15': 0.0,
+     'CNN1D_16': 0.0,
+     'CNN1D_17': 0.0,
+     'CNN1D_18': 0.0,
+     'CNN1D_19': 0.0,
+     'CNN1D_2': 0.0,
+     'CNN1D_20': 0.0,
+     'CNN1D_21': 0.0,
+     'CNN1D_22': 0.0,
+     'CNN1D_23': 0.0,
+     'CNN1D_24': 0.0,
+     'CNN1D_25': 0.0,
+     'CNN1D_26': 0.0,
+     'CNN1D_27': 0.0,
+     'CNN1D_28': 0.0,
+     'CNN1D_29': 0.0,
+     'CNN1D_3': 0.0,
+     'CNN1D_30': 0.0,
+     'CNN1D_31': 0.0,
+     'CNN1D_32': 0.0,
+     'CNN1D_33': 0.0,
+     'CNN1D_34': 0.0,
+     'CNN1D_35': 0.0,
+     'CNN1D_36': 0.0,
+     'CNN1D_37': 0.0,
+     'CNN1D_38': 0.0,
+     'CNN1D_39': 0.0,
+     'CNN1D_4': 0.0,
+     'CNN1D_40': 0.0,
+     'CNN1D_41': 0.0,
+     'CNN1D_42': 0.0,
+     'CNN1D_43': 0.0,
+     'CNN1D_44': 0.0,
+     'CNN1D_45': 0.0,
+     'CNN1D_46': 0.0,
+     'CNN1D_47': 0.0,
+     'CNN1D_48': 0.0,
+     'CNN1D_49': 0.0,
+     'CNN1D_5': 0.0,
+     'CNN1D_50': 0.0,
+     'CNN1D_51': 0.0,
+     'CNN1D_52': 0.0,
+     'CNN1D_53': 0.0,
+     'CNN1D_54': 0.0,
+     'CNN1D_55': 0.0,
+     'CNN1D_56': 0.0,
+     'CNN1D_57': 0.0,
+     'CNN1D_58': 0.0,
+     'CNN1D_59': 0.0,
+     'CNN1D_6': 0.0,
+     'CNN1D_60': 0.0,
+     'CNN1D_61': 0.0,
+     'CNN1D_62': 0.0,
+     'CNN1D_63': 0.0,
+     'CNN1D_7': 0.0,
+     'CNN1D_8': 0.0,
+     'CNN1D_9': 0.0,
+     'cos_latitude': 0.642,
+     'divergence': -0.0,
+     'divergence_del2': 0.006,
+     'divergence_dlat': 0.001,
+     'divergence_dlon': -0.0,
+     'geopotential_at_surface': 0.004,
+     'geopotential_at_surface_del2': -0.068,
+     'geopotential_at_surface_dlat': -0.011,
+     'geopotential_at_surface_dlon': -0.0,
+     'land_sea_mask': 0.334,
+     'learned_positional_features': 0.0,
+     'log_surface_pressure': 1.716,
+     'log_surface_pressure_del2': 0.819,
+     'log_surface_pressure_dlat': 0.135,
+     'log_surface_pressure_dlon': 0.0,
+     'memory_divergence': -0.0,
+     'memory_log_surface_pressure': 1.716,
+     'memory_specific_cloud_ice_water_content': 0.0,
+     'memory_specific_cloud_liquid_water_content': 0.0,
+     'memory_specific_humidity': 0.003298,
+     'memory_temperature_variation': -4.946,
+     'memory_u': 0.007,
+     'memory_v': -0.0,
+     'memory_vorticity': -0.002,
+     'pressure': 2.798,
+     'radiation': 0.214,
+     'sea_ice_cover': 0.24,
+     'sea_surface_temperature': 285.14,
+     'sin_latitude': 0.0,
+     'specific_cloud_ice_water_content': 0.0,
+     'specific_cloud_ice_water_content_del2': 0.0,
+     'specific_cloud_ice_water_content_dlat': 0.0,
+     'specific_cloud_ice_water_content_dlon': -0.0,
+     'specific_cloud_liquid_water_content': 0.0,
+     'specific_cloud_liquid_water_content_del2': 0.0,
+     'specific_cloud_liquid_water_content_dlat': 0.0,
+     'specific_cloud_liquid_water_content_dlon': 0.0,
+     'specific_humidity': 0.0,
+     'specific_humidity_del2': 0.0,
+     'specific_humidity_dlat': 0.0,
+     'specific_humidity_dlon': 0.0,
+     'surface_embedding': 0.0,
+     'temperature_variation': -5.126,
+     'temperature_variation_del2': 46.171,
+     'temperature_variation_dlat': 5.054,
+     'temperature_variation_dlon': 0.0,
+     'u': 0.007,
+     'u_del2': 0.147,
+     'u_dlat': 0.002,
+     'u_dlon': 0.0,
+     'v': -0.0,
+     'v_del2': -0.001,
+     'v_dlat': -0.0,
+     'v_dlon': 0.0,
+     'vorticity': -0.002,
+     'vorticity_del2': -0.399,
+     'vorticity_dlat': 0.036,
+     'vorticity_dlon': -0.0}
+
+# Parameters for SigmaCoordinatesEquidistant:
+# ==============================================================================
+SigmaCoordinatesEquidistant.layers = %N_SIGMA_LAYERS
+
+# Parameters for custom_corrds/SigmaCoordinatesEquidistant:
+# ==============================================================================
+custom_corrds/SigmaCoordinatesEquidistant.layers = %N_SIGMA_LAYERS
+
+# Parameters for advance/SoftClip:
+# ==============================================================================
+advance/SoftClip.hinge_softness = 1.0
+advance/SoftClip.max_value = 16
+advance/SoftClip.name = None
+
+# Parameters for StochasticModularStepModel:
+# ==============================================================================
+StochasticModularStepModel.advance_module = @StochasticPhysicsParameterizationStep
+StochasticModularStepModel.decoder_module = \
+    @DimensionalLearnedPrimitiveToWeatherbenchDecoder
+StochasticModularStepModel.encoder_module = \
+    @DimensionalLearnedWeatherbenchToPrimitiveWithMemoryEncoder
+StochasticModularStepModel.forcing_module = @DynamicDataForcing
+StochasticModularStepModel.name = None
+
+# Parameters for StochasticPhysicsParameterizationStep:
+# ==============================================================================
+StochasticPhysicsParameterizationStep.checkpoint_substep = False
+StochasticPhysicsParameterizationStep.corrector_module = %CORRECTOR_MODULE
+StochasticPhysicsParameterizationStep.name = None
+StochasticPhysicsParameterizationStep.num_substeps = %NUM_SUBSTEPS
+StochasticPhysicsParameterizationStep.physics_parameterization_module = \
+    @DivCurlNeuralParameterization
+StochasticPhysicsParameterizationStep.randomness_module = @ZerosRandomField
+
+# Parameters for land_model/TakeSurfaceAdjacentSigmaLevel:
+# ==============================================================================
+land_model/TakeSurfaceAdjacentSigmaLevel.name = None
+
+# Parameters for sea_ice_model/TakeSurfaceAdjacentSigmaLevel:
+# ==============================================================================
+sea_ice_model/TakeSurfaceAdjacentSigmaLevel.name = None
+
+# Parameters for advance/ToModalDiffOperators:
+# ==============================================================================
+advance/ToModalDiffOperators.name = None
+
+# Parameters for decoder_model/ToModalDiffOperators:
+# ==============================================================================
+decoder_model/ToModalDiffOperators.name = None
+
+# Parameters for encoder_data/ToModalDiffOperators:
+# ==============================================================================
+encoder_data/ToModalDiffOperators.name = None
+
+# Parameters for with_grads/ToModalDiffOperators:
+# ==============================================================================
+with_grads/ToModalDiffOperators.name = None
+
+# Parameters for trajectory_from_step:
+# ==============================================================================
+trajectory_from_step.checkpoint_multistep = False
+trajectory_from_step.checkpoint_post_process = True
+trajectory_from_step.checkpoint_step = True
+
+# Parameters for advance/TruncateSigmaLevels:
+# ==============================================================================
+advance/TruncateSigmaLevels.name = None
+advance/TruncateSigmaLevels.sigma_ranges = \
+    {'divergence': (0.0, 1),
+     'geopotential': (0.0, 1),
+     'specific_cloud_ice_water_content': (0.0, 1),
+     'specific_cloud_liquid_water_content': (0.0, 1),
+     'specific_humidity': (0.0, 1),
+     't': (0.0, 1),
+     'temperature_variation': (0.0, 1),
+     'u': (0.0, 1),
+     'u_component_of_wind': (0.0, 1),
+     'v': (0.0, 1),
+     'v_component_of_wind': (0.0, 1),
+     'vorticity': (0.0, 1),
+     'z': (0.0, 1)}
+
+# Parameters for decoder_model/TruncateSigmaLevels:
+# ==============================================================================
+decoder_model/TruncateSigmaLevels.name = None
+decoder_model/TruncateSigmaLevels.sigma_ranges = \
+    {'divergence': (0.0, 1),
+     'geopotential': (0.0, 1),
+     'specific_cloud_ice_water_content': (0.0, 1),
+     'specific_cloud_liquid_water_content': (0.0, 1),
+     'specific_humidity': (0.0, 1),
+     't': (0.0, 1),
+     'temperature_variation': (0.0, 1),
+     'u': (0.0, 1),
+     'u_component_of_wind': (0.0, 1),
+     'v': (0.0, 1),
+     'v_component_of_wind': (0.0, 1),
+     'vorticity': (0.0, 1),
+     'z': (0.0, 1)}
+
+# Parameters for advance/VelocityAndPrognostics:
+# ==============================================================================
+advance/VelocityAndPrognostics.compute_gradients_module = @ToModalDiffOperators
+advance/VelocityAndPrognostics.fields_to_include = \
+    ['divergence',
+     'vorticity',
+     'u',
+     'v',
+     'temperature_variation',
+     'log_surface_pressure',
+     'specific_humidity',
+     'specific_cloud_liquid_water_content',
+     'specific_cloud_ice_water_content']
+advance/VelocityAndPrognostics.name = None
+
+# Parameters for decoder_model/VelocityAndPrognostics:
+# ==============================================================================
+decoder_model/VelocityAndPrognostics.compute_gradients_module = \
+    @ToModalDiffOperators
+decoder_model/VelocityAndPrognostics.fields_to_include = \
+    ['divergence',
+     'vorticity',
+     'u',
+     'v',
+     'temperature_variation',
+     'specific_humidity']
+decoder_model/VelocityAndPrognostics.name = None
+
+# Parameters for embedding_model/VelocityAndPrognostics:
+# ==============================================================================
+embedding_model/VelocityAndPrognostics.fields_to_include = \
+    ['divergence',
+     'vorticity',
+     'u',
+     'v',
+     'temperature_variation',
+     'specific_humidity',
+     'specific_cloud_liquid_water_content',
+     'specific_cloud_ice_water_content']
+embedding_model/VelocityAndPrognostics.name = None
+
+# Parameters for encoder_data/VelocityAndPrognostics:
+# ==============================================================================
+encoder_data/VelocityAndPrognostics.compute_gradients_module = \
+    @ToModalDiffOperators
+encoder_data/VelocityAndPrognostics.fields_to_include = \
+    ['u',
+     'v',
+     't',
+     'z',
+     'specific_humidity',
+     'specific_cloud_liquid_water_content',
+     'specific_cloud_ice_water_content']
+encoder_data/VelocityAndPrognostics.name = None
+
+# Parameters for land_model/VelocityAndPrognostics:
+# ==============================================================================
+land_model/VelocityAndPrognostics.features_transform_module = \
+    @TakeSurfaceAdjacentSigmaLevel
+land_model/VelocityAndPrognostics.fields_to_include = \
+    ['temperature_variation', 'specific_humidity']
+land_model/VelocityAndPrognostics.name = None
+
+# Parameters for sea_ice_model/VelocityAndPrognostics:
+# ==============================================================================
+sea_ice_model/VelocityAndPrognostics.features_transform_module = \
+    @TakeSurfaceAdjacentSigmaLevel
+sea_ice_model/VelocityAndPrognostics.fields_to_include = \
+    ['temperature_variation', 'specific_humidity']
+sea_ice_model/VelocityAndPrognostics.name = None
+
+# Parameters for VerticalConvTower:
+# ==============================================================================
+VerticalConvTower.activate_final = False
+VerticalConvTower.activation = %ACTIVATION
+VerticalConvTower.channels = [64, 64, 64, 64]
+VerticalConvTower.checkpoint_tower = True
+VerticalConvTower.kernel_shape = 5
+VerticalConvTower.name = None
+VerticalConvTower.with_bias = True
+
+# Parameters for WhirlModel:
+# ==============================================================================
+WhirlModel.from_xarray_fn = @xarray_to_state_and_dynamic_covariate_data
+WhirlModel.model_cls = @StochasticModularStepModel
+WhirlModel.to_xarray_fn = @data_to_xarray_with_renaming
+
+# Parameters for xarray_to_data_with_renaming:
+# ==============================================================================
+xarray_to_data_with_renaming.renaming_dict = \
+    {'geopotential': 'z',
+     'latitude': 'lat',
+     'longitude': 'lon',
+     'temperature': 't',
+     'u_component_of_wind': 'u',
+     'v_component_of_wind': 'v'}
+xarray_to_data_with_renaming.xarray_to_data_fn = @xarray_to_weatherbench_data
+
+# Parameters for xarray_to_dynamic_covariate_data:
+# ==============================================================================
+xarray_to_dynamic_covariate_data.covariates_to_include = \
+    ('sea_ice_cover', 'sea_surface_temperature')
+
+# Parameters for xarray_to_state_and_dynamic_covariate_data:
+# ==============================================================================
+xarray_to_state_and_dynamic_covariate_data.values = 'values'
+xarray_to_state_and_dynamic_covariate_data.xarray_to_dynamic_covariate_data_fn = \
+    @xarray_to_dynamic_covariate_data
+xarray_to_state_and_dynamic_covariate_data.xarray_to_state_data_fn = \
+    @xarray_to_data_with_renaming
+
+# Parameters for xarray_to_weatherbench_data:
+# ==============================================================================
+xarray_to_weatherbench_data.diagnostics_to_include = ()
+xarray_to_weatherbench_data.tracers_to_include = \
+    ('specific_humidity',
+     'specific_cloud_liquid_water_content',
+     'specific_cloud_ice_water_content')
+
+# Parameters for ZerosRandomField:
+# ==============================================================================
+ZerosRandomField.prefer_nodal = True
