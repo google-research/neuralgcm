@@ -29,9 +29,12 @@
 # sys.path.insert(0, os.path.abspath('.'))
 
 # Print Python environment info for easier debugging on ReadTheDocs
-
+import inspect
+import operator
+import os
 import sys
 import subprocess
+
 import dinosaur  # verify this works
 import neuralgcm  # verify this works
 
@@ -58,6 +61,7 @@ author = 'NeuralGCM authors'
 extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.autosummary',
+    'sphinx.ext.linkcode',
     'sphinx.ext.napoleon',
     'myst_nb',
 ]
@@ -102,5 +106,34 @@ autosummary_generate = True
 # https://myst-nb.readthedocs.io/en/latest/computation/execute.html
 nb_execution_mode = "off"
 
-# https://stackoverflow.com/a/66295922/809705
-autodoc_typehints = "description"
+# https://www.sphinx-doc.org/en/master/usage/extensions/autodoc.html#confval-autodoc_typehints
+autodoc_typehints = "signature"
+autodoc_typehints_description_target = "documented"
+autodoc_typehints_format = "short"
+
+# Customize code links via sphinx.ext.linkcode
+# Borrowed from JAX: https://github.com/google/jax/pull/20961
+
+def linkcode_resolve(domain, info):
+  if domain != 'py':
+    return None
+  if not info['module']:
+    return None
+  if not info['fullname']:
+    return None
+  try:
+    mod = sys.modules.get(info['module'])
+    obj = operator.attrgetter(info['fullname'])(mod)
+    if isinstance(obj, property):
+        obj = obj.fget
+    while hasattr(obj, '__wrapped__'):  # decorated functions
+        obj = obj.__wrapped__
+    filename = inspect.getsourcefile(obj)
+    source, linenum = inspect.getsourcelines(obj)
+    print(f'found source code for: {info}')
+  except Exception as e:
+    print(f'did not find source code for: {info}: {e}')
+    return None
+  filename = os.path.relpath(filename, start=os.path.dirname(neuralgcm.__file__))
+  lines = f"#L{linenum}-L{linenum + len(source)}" if linenum else ""
+  return f"https://github.com/google-research/neuralgcm/blob/main/neuralgcm/{filename}{lines}"
