@@ -107,22 +107,11 @@ class APITest(absltest.TestCase):
     model = load_tl63_stochastic_model()
     ds = neuralgcm.demo.load_data(model.data_coords)
 
-    state_variables = [
-        'u_component_of_wind',
-        'v_component_of_wind',
-        'geopotential',
-        'temperature',
-        'specific_humidity',
-        'specific_cloud_liquid_water_content',
-        'specific_cloud_ice_water_content',
-    ]
-    forcing_variables = ['sea_surface_temperature', 'sea_ice_cover']
-
-    expected_inputs = {k: ds[k].values for k in state_variables}
+    expected_inputs = {k: ds[k].values for k in model.input_variables}
     expected_inputs['sim_time'] = np.array([-92034.607104])
 
     expected_forcings = {
-        k: ds[k].values[:, np.newaxis, :, :] for k in forcing_variables
+        k: ds[k].values[:, np.newaxis, :, :] for k in model.forcing_variables
     }
     expected_forcings['sim_time'] = np.array([-92034.607104])
 

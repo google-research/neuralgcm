@@ -43,6 +43,7 @@ Numeric = float | np.ndarray | jax.Array | xarray.DataArray
 # TODO(shoyer): make these types more precise
 Inputs = dict[str, ArrayLike]
 Forcings = dict[str, ArrayLike]
+TemporalForcings = dict[str, ArrayLike]
 Outputs = dict[str, jax.Array]
 BatchedOutputs = dict[str, jax.Array]
 State = Any
@@ -484,7 +485,7 @@ class PressureLevelModel:
   def unroll(
       self,
       state: State,
-      forcings: Forcings,
+      forcings: TemporalForcings,
       *,
       steps: int,
       timedelta: TimedeltaLike | None = None,
@@ -497,43 +498,60 @@ class PressureLevelModel:
 
       advanced_state, outputs = model.unroll(state, forcings, steps=N)
 
-    where `advanced_state` is the advanced model state after `N` steps and
-    `outputs` is a trajectory of decoded states on pressure-levels with a
-    leading dimension of size `N`.
+    where ``advanced_state`` is the advanced model state after ``N`` steps and
+    ``outputs`` is a trajectory of decoded states on pressure-levels with a
+    leading dimension of size ``N``.
 
     Args:
       state: initial model state.
       forcings: forcing data over the time-period spanned by the desired output
         trajectory. Should include a leading time-axis, but times can be at any
-        desired granularity compatible with the model (e.g., it should be fine
-        to supply daily forcing data, even if producing hourly outputs).
+        desired granularity (e.g., it should be fine to supply daily forcing
+        data, even if producing hourly outputs). The nearest forcing in time
+        will be used for each internal ``advance()`` and ``decode()`` call.
       steps: number of time-steps to take.
       timedelta: size of each time-step to take, which must be a multiple of the
         internal model timestep. By default uses the internal model timestep.
-      start_with_input: if `True`, outputs are at times `[0, ..., (steps - 1) *
-        timestep]` relative to the initial time; if `False`, outputs are at
-        times `[timestep, ..., steps * timestep]`.
-      post_process_fn: optional function to apply to each advanced state to
-        create outputs. By default, uses `lambda x: model.decode(x, forcings)`.
+      start_with_input: if ``True``, outputs are at times ``[0, ...,
+        (steps - 1) * timestep]`` relative to the initial time; if ``False``,
+        outputs are at times ``[timestep, ..., steps * timestep]``.
+      post_process_fn: optional function to apply to each advanced state and
+        current forcings to create outputs like
+        ``post_process_fn(state, forcings)``, where ``forcings`` does not
+        include a time axis. By default, uses ``model.decode``.
 
     Returns:
-      A tuple of the advanced state at time `steps * timestamp`, and outputs
-      with a leading `time` axis at the time-steps specified by
-      `start_with_input`.
+      A tuple of the advanced state at time ``steps * timestamp``, and outputs
+      with a leading ``time`` axis at the time-steps specified by ``steps``,
+      ``timedelta`` and ``start_with_input``.
     """
     if timedelta is None:
       timedelta = self.timestep
 
+    def get_nearest_forcings(sim_time):
+      times = forcings['sim_time']
+      assert isinstance(times, jax.Array)
+      approx_index = jnp.interp(sim_time, times, jnp.arange(times.size))
+      index = jnp.round(approx_index).astype(jnp.int32)
+      return jax.tree.map(lambda x: x[index, ...], forcings)
+
+    def with_nearest_forcings(func):
+      def wrapped(state):
+        sim_time = _sim_time_from_state(state)
+        forcings = get_nearest_forcings(sim_time)
+        return func(state, forcings)
+      return wrapped
+
     if post_process_fn is None:
-      post_process_fn = functools.partial(self.decode, forcings=forcings)
+      post_process_fn = self.decode
 
     inner_steps = _calculate_sub_steps(self.timestep, timedelta)
     trajectory_func = time_integration.trajectory_from_step(
-        functools.partial(self.advance, forcings=forcings),
+        with_nearest_forcings(self.advance),
         outer_steps=steps,
         inner_steps=inner_steps,
         start_with_input=start_with_input,
-        post_process_fn=post_process_fn,
+        post_process_fn=with_nearest_forcings(post_process_fn),
     )
     state, outputs = trajectory_func(state)
     return state, outputs
