@@ -35,6 +35,7 @@ usability -- stay tuned!
 :maxdepth: 1
 installation.md
 inference_demo.ipynb
+datasets.ipynb
 trained_models.ipynb
 api.md
 ```
