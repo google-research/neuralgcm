@@ -42,6 +42,6 @@ import neuralgcm.perturbations
 import neuralgcm.stochastic
 import neuralgcm.towers
 
-from neuralgcm.api import PressureLevelModel
+from neuralgcm.api import Model
 
 __version__ = "0.1.0"

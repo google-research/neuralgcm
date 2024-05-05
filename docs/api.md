@@ -4,12 +4,12 @@
 .. currentmodule:: neuralgcm
 ```
 
-## PressureLevelModel
+## Model
 
-The user-facing API for NeuralGCM models centers around `PressureLevelModel`:
+The user-facing API for NeuralGCM models centers around `Model`:
 
 ```{eval-rst}
-.. autoclass:: PressureLevelModel
+.. autoclass:: Model
 ```
 
 ### Constructor
@@ -17,7 +17,7 @@ The user-facing API for NeuralGCM models centers around `PressureLevelModel`:
 Use this class method to create a new model:
 
 ```{eval-rst}
-.. automethod:: PressureLevelModel.from_checkpoint
+.. automethod:: Model.from_checkpoint
 ```
 
 ### Properties
@@ -26,11 +26,11 @@ These properties describe the coordinate system and variables for which a model
 is defined:
 
 ```{eval-rst}
-.. autoproperty:: PressureLevelModel.timestep
-.. autoproperty:: PressureLevelModel.data_coords
-.. autoproperty:: PressureLevelModel.model_coords
-.. autoproperty:: PressureLevelModel.input_variables
-.. autoproperty:: PressureLevelModel.forcing_variables
+.. autoproperty:: Model.timestep
+.. autoproperty:: Model.data_coords
+.. autoproperty:: Model.model_coords
+.. autoproperty:: Model.input_variables
+.. autoproperty:: Model.forcing_variables
 ```
 
 ### Learned methods
@@ -42,10 +42,10 @@ variables defined on model coordinates (i.e., sigma levels) and back.
 `advance` and `unroll` allow for stepping forward in time.
 
 ```{eval-rst}
-.. automethod:: PressureLevelModel.encode
-.. automethod:: PressureLevelModel.decode
-.. automethod:: PressureLevelModel.advance
-.. automethod:: PressureLevelModel.unroll
+.. automethod:: Model.encode
+.. automethod:: Model.decode
+.. automethod:: Model.advance
+.. automethod:: Model.unroll
 ```
 
 ### Unit conversion
@@ -55,10 +55,10 @@ The internal state of NeuralGCM models uses non-dimensional units and
 for converting arrays back and forth, including inside JAX code:
 
 ```{eval-rst}
-.. automethod:: PressureLevelModel.to_nondim_units
-.. automethod:: PressureLevelModel.from_nondim_units
-.. automethod:: PressureLevelModel.datetime64_to_sim_time
-.. automethod:: PressureLevelModel.sim_time_to_datetime64
+.. automethod:: Model.to_nondim_units
+.. automethod:: Model.from_nondim_units
+.. automethod:: Model.datetime64_to_sim_time
+.. automethod:: Model.sim_time_to_datetime64
 ```
 
 ### Xarray conversion
@@ -68,10 +68,10 @@ with JAX. Use these methods to convert between `xarray.Dataset` objects and
 inputs/outputs from learned methods:
 
 ```{eval-rst}
-.. automethod:: PressureLevelModel.inputs_from_xarray
-.. automethod:: PressureLevelModel.forcings_from_xarray
-.. automethod:: PressureLevelModel.data_from_xarray
-.. automethod:: PressureLevelModel.data_to_xarray
+.. automethod:: Model.inputs_from_xarray
+.. automethod:: Model.forcings_from_xarray
+.. automethod:: Model.data_from_xarray
+.. automethod:: Model.data_to_xarray
 ```
 
 ## Demo dataset & models

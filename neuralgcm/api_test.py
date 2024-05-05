@@ -26,7 +26,7 @@ def _assert_allclose(actual, desired, *, err_msg=None, range_rtol=1e-5):
 
 
 def load_tl63_stochastic_model():
-  return neuralgcm.PressureLevelModel.from_checkpoint(
+  return neuralgcm.Model.from_checkpoint(
       neuralgcm.demo.load_checkpoint_tl63_stochastic()
   )
 

@@ -13,7 +13,7 @@ for reproducing and extending results from our paper,
 3. **ML training**: Pseudo-code for training NeuralGCM models can be found in
    the [`reference_code` subdirectory](https://github.com/google-research/neuralgcm/tree/main/neuralgcm/reference_code).
 4. **ML inference**: Code for running forecasts with pre-trained models,
-   encapsulated in the {py:class}`~neuralgcm.PressureLevelModel` class.
+   encapsulated in the {py:class}`~neuralgcm.Model` class.
 5. **Evaluation**: Code for evaluating NeuralGCM weather forecasts, along with
    archived re-forecasts for 2020, can be found in the
    [WeatherBench2](https://github.com/google-research/weatherbench2) project.

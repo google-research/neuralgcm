@@ -173,7 +173,7 @@ def _expand_tracers(inputs: dict) -> dict:
 
 
 @tree_util.register_pytree_node_class
-class PressureLevelModel:
+class Model:
   """Inference-only API for models that predict dense data on pressure levels.
 
   These models are trained on ECMWF ERA5 data on pressure-levels as stored in
@@ -557,8 +557,8 @@ class PressureLevelModel:
     return state, outputs
 
   @classmethod
-  def from_checkpoint(cls, checkpoint: Any) -> PressureLevelModel:
-    """Creates a PressureLevelModel from a checkpoint.
+  def from_checkpoint(cls, checkpoint: Any) -> Model:
+    """Creates a Model from a checkpoint.
 
     Args:
       checkpoint: dictionary with keys "model_config_str", "aux_ds_dict" and
@@ -566,7 +566,7 @@ class PressureLevelModel:
         dataset with model-specific static features, and model parameters.
 
     Returns:
-      Instance of a `PressureLevelModel` with weights and configuration
+      Instance of a `Model` with weights and configuration
       specified by the checkpoint.
     """
     with gin_utils.specific_config(checkpoint['model_config_str']):
@@ -587,3 +587,5 @@ class PressureLevelModel:
       return cls(
           whirl_model, checkpoint['params'], checkpoint['model_config_str']
       )
+
+PressureLevelModel = Model  # deprecated alias
