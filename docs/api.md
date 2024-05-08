@@ -33,6 +33,7 @@ is defined:
 .. autoproperty:: PressureLevelModel.forcing_variables
 ```
 
+(learned-methods)=
 ### Learned methods
 
 These method use trained model parameters to convert from input variables
@@ -70,7 +71,6 @@ inputs/outputs from learned methods:
 ```{eval-rst}
 .. automethod:: PressureLevelModel.inputs_from_xarray
 .. automethod:: PressureLevelModel.forcings_from_xarray
-.. automethod:: PressureLevelModel.data_from_xarray
 .. automethod:: PressureLevelModel.data_to_xarray
 ```
 
