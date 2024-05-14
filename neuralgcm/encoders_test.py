@@ -125,18 +125,18 @@ class EncodersTest(parameterized.TestCase):
         'sim_time': np.asarray(0.0),
         'tracers': {},
     }
-    inputs = jax.tree_map(lambda x: x[np.newaxis, ...], inputs)
+    inputs = jax.tree.map(lambda x: x[np.newaxis, ...], inputs)
     rng = jax.random.PRNGKey(42)
     params = encoder_model.init(rng, inputs)
     encoded_state = (encoder_model.apply(params, rng, inputs).state).asdict()
 
-    get_shape_fn = lambda tree: jax.tree_map(np.shape, tree)
+    get_shape_fn = lambda tree: jax.tree.map(np.shape, tree)
     expected_shapes = primitive_equations.StateWithTime(
         divergence=coords.modal_shape,
         vorticity=coords.modal_shape,
         temperature_variation=coords.modal_shape,
         log_surface_pressure=coords.surface_modal_shape,
-        tracers=jax.tree_map(
+        tracers=jax.tree.map(
             lambda x: coords.modal_shape,
             inputs['tracers']
         ),

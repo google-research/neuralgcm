@@ -139,13 +139,13 @@ class DecodersTest(parameterized.TestCase):
     params = decoder_model.init(jax.random.PRNGKey(42), inputs)
     decoded_state = decoder_model.apply(params, jax.random.PRNGKey(42), inputs)
 
-    get_shape_fn = lambda tree: jax.tree_map(lambda x: x.shape, tree)
+    get_shape_fn = lambda tree: jax.tree.map(lambda x: x.shape, tree)
     expected_shapes = weatherbench_utils.State(
         u=output_coords.nodal_shape,
         v=output_coords.nodal_shape,
         t=output_coords.nodal_shape,
         z=output_coords.nodal_shape,
-        tracers=jax.tree_map(lambda x: output_coords.nodal_shape,
+        tracers=jax.tree.map(lambda x: output_coords.nodal_shape,
                              inputs.state.tracers),
         sim_time=tuple(),
     ).asdict()
