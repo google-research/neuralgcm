@@ -18,7 +18,7 @@ for reproducing and extending results from our paper,
    archived re-forecasts for 2020, can be found in the
    [WeatherBench2](https://github.com/google-research/weatherbench2) project.
 
-The documentation here focuses mostly on our API for **inference** (i.e., running
+The documentation here focuses mostly on our API for *inference* (i.e., running
 trained NeuralGCM atmospheric models), which we believe is the most immediately
 useful part of the NeuralGCM code for third parties. It is also a part of our
 code that we can commit to supporting in roughly its current form.
