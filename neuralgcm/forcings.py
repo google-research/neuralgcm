@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import functools
+import logging
 from typing import Any, Optional, Union
 
 from dinosaur import coordinate_systems
@@ -46,6 +47,8 @@ QuantityOrStr = Union[str, scales.Quantity]
 # TODO(langmore) Use a more universal mechanism (not just in forcings.py) to
 # handle errors, if we like this, then make public.
 _FORCING_ERRORS = []
+
+# pylint: disable=logging-fstring-interpolation
 
 
 class ForcingDataError(Exception):
@@ -102,6 +105,7 @@ class DynamicDataForcing(hk.Module):
       check_sim_time_errors: bool = False,
       name: Optional[str] = None,
   ):
+    logging.info(f'[NGCM] Initializing DynamicDataForcing with {dt_tolerance=}')
     # TODO(shoyer): remove data_time_step entirely, once we're sure that no
     # saved checkpoints that we care about will break.
     del data_time_step  # no longer used
@@ -183,6 +187,7 @@ class PersistenceDataForcing(hk.Module):
       time_axis: int = 0,
       name: Optional[str] = None,
   ):
+    logging.info('[NGCM] Initializing PersistenceDataForcing')
     super().__init__(name=name)
     self.time_axis = time_axis
     self.nondim_transform_fn = transforms.NondimensionalizeTransform(
