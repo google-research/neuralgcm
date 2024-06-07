@@ -289,6 +289,7 @@ class EvaporationPrecipitationDiagnostics(
       method_precipitation: str = 'cumulative',
       method_evaporation: str = 'rate',
       name: Optional[str] = None,
+      field_name: str = 'precipitation_cumulative',
   ):
     # del aux_features
     super().__init__(name=name)
@@ -308,6 +309,7 @@ class EvaporationPrecipitationDiagnostics(
     self.water_density = self.physics_specs.nondimensionalize(
         scales.WATER_DENSITY
     )
+    self.field_name = field_name
 
   def __call__(
       self,
@@ -339,9 +341,9 @@ class EvaporationPrecipitationDiagnostics(
       )
     elif self.method_precipitation == 'cumulative':  # units: length
       previous = model_state.diagnostics.get(
-          'precipitation_cumulative', jnp.zeros(surface_nodal_shape)
+          self.field_name, jnp.zeros(surface_nodal_shape)
       )
-      output_dict['precipitation_cumulative'] = previous - (
+      output_dict[self.field_name] = previous - (
           ((e_minus_p + evaporation['evaporation']) / self.water_density)
           * self.dt
       )
