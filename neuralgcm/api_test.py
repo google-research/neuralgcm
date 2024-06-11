@@ -83,6 +83,23 @@ class APITest(absltest.TestCase):
 
     self.assertEqual(model.model_coords.nodal_shape, (32, 128, 64))
 
+  def test_pytree(self):
+    model = load_tl63_stochastic_model()
+    tree_def = jax.tree.structure(model)
+    self.assertEqual(tree_def, tree_def)
+
+    trace_count = 0
+
+    @jax.jit
+    def f(model):  # pylint: disable=unused-argument
+      nonlocal trace_count
+      trace_count += 1
+      return 0
+
+    f(model)
+    f(model)
+    self.assertEqual(trace_count, 1)
+
   def test_to_and_from_nondim_units(self):
     model = load_tl63_stochastic_model()
 
