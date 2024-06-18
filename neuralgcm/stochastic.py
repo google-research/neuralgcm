@@ -37,6 +37,10 @@ Numeric = typing.Numeric
 Quantity = typing.Quantity
 _SOFTPLUS_INVERSE_1 = 0.5413248546129181
 
+# Effectively constant correlation time/length.
+CONSTANT_CORRELATION_TIME_HRS = 24 * 365 * 1000  # 1000 years in hours
+CONSTANT_CORRELATION_LENGTH_KM = 40_075 * 10  # 10x circumference of earth in km
+
 # CoreRandomState is advanced by a RandomField, and .to_*_values(core_state)
 # produces the final (usable) random Array.
 CoreRandomState = typing.Pytree
@@ -308,7 +312,12 @@ class GaussianRandomField(RandomField):
     correlation_length = maybe_nondimensionalize(
         correlation_length, physics_specs
     )
+
+    # In sampling, phi appears as 1 - phi**2 = 1 - exp(-2 dt / tau)
+    self.one_minus_phi2 = -jnp.expm1(-2 * dt / tau)
+
     self.phi = jnp.exp(-dt / tau)
+
     self._variance = maybe_nondimensionalize(variance, physics_specs)  # σ²
 
     # [Palmer] states correlation_length = sqrt(2κT) / R, therefore
@@ -348,7 +357,9 @@ class GaussianRandomField(RandomField):
     # We do not include the extra fator of 2 in the denominator. I do not know
     # why [Palmer] has this factor.
     normalization = jnp.sqrt(
-        self._integrated_grf_variance() * (1 - self.phi**2) / sum_unnormed_vars
+        self._integrated_grf_variance()
+        * self.one_minus_phi2
+        / sum_unnormed_vars
     )
 
     # The factor of coords.horizontal.radius appears because our basis vectors
@@ -373,7 +384,7 @@ class GaussianRandomField(RandomField):
         jax.random.truncated_normal(rng, -self.clip, self.clip, modal_shape),
         jnp.zeros(modal_shape),
     )
-    core = (1 - self.phi**2) ** (-0.5) * sigmas * weights
+    core = self.one_minus_phi2 ** (-0.5) * sigmas * weights
     return RandomnessState(
         core=core,
         nodal_value=self.to_nodal_values(core),
@@ -620,6 +631,7 @@ class BatchGaussianRandomFieldModule(hk.Module):
       initial_correlation_lengths: Sequence[Quantity | str] = gin.REQUIRED,
       variances: Sequence[Quantity | str] = gin.REQUIRED,
       field_subset: Optional[Sequence[int]] = None,
+      n_fixed_fields: Optional[int] = None,
       clip: float = 6.0,
       name: Optional[str] = None,
   ):
@@ -643,6 +655,10 @@ class BatchGaussianRandomFieldModule(hk.Module):
         Specifies which fields to construct. If None, use all fields. E.g.,
         field_subset=[0, 5] means form 3 GRFs from the 0th and 5th parameter
         values.
+      n_fixed_fields: Number of fields that use fixed parameters. These will
+        be fixed at the trailing `n_fixed_fields` initial correlations. The
+        total number of fields is unchanged, since these fixed fields replace
+        learnable fields.
       clip: number of standard deviations at which to clip randomness to ensure
         numerical stability.
       name: Name to show in xprof.
@@ -657,6 +673,7 @@ class BatchGaussianRandomFieldModule(hk.Module):
     ]
     if len(set(lengths)) != 1:
       raise ValueError(f'Argument lengths differed: {lengths=}')
+    n_fixed_fields = n_fixed_fields or 0
 
     # Get subset of args using `field_subset`
     if field_subset is not None:
@@ -687,9 +704,12 @@ class BatchGaussianRandomFieldModule(hk.Module):
     ])
     correlation_lengths_raw = hk.get_parameter(
         'correlation_lengths_raw',
-        shape=(self.n_fields,),
+        shape=(self.n_fields - n_fixed_fields,),
         init=hk.initializers.Constant(0.0),
     )
+    if n_fixed_fields:
+      correlation_lengths_raw = jnp.concatenate([
+          correlation_lengths_raw, jnp.zeros([n_fixed_fields])])
     self._correlation_lengths = convert_hk_param_to_positive_scalar(
         correlation_lengths_raw, initial_correlation_lengths
     )
@@ -699,9 +719,12 @@ class BatchGaussianRandomFieldModule(hk.Module):
     )
     correlation_times_raw = hk.get_parameter(
         'correlation_times_raw',
-        shape=(self.n_fields,),
+        shape=(self.n_fields - n_fixed_fields,),
         init=hk.initializers.Constant(0.0),
     )
+    if n_fixed_fields:
+      correlation_times_raw = jnp.concatenate([
+          correlation_times_raw, jnp.zeros([n_fixed_fields])])
     self._correlation_times = convert_hk_param_to_positive_scalar(
         correlation_times_raw, initial_correlation_times
     )

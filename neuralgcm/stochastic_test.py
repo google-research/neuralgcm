@@ -461,20 +461,25 @@ class BatchGaussianRandomFieldModuleTest(BaseRandomFieldTest):
       initial_correlation_lengths,
       initial_correlation_times,
       field_subset=None,
+      n_fixed_fields=None,
   ):
-    physics_specs = primitive_equations.PrimitiveEquationsSpecs.from_si()
-    self.dt = physics_specs.nondimensionalize(1 * scales.units.hour)
+    self.physics_specs = primitive_equations.PrimitiveEquationsSpecs.from_si()
+    self.dt = self.physics_specs.nondimensionalize(1 * scales.units.hour)
 
     return stochastic.BatchGaussianRandomFieldModule(
         self.coords,
         self.dt,
-        physics_specs,
+        self.physics_specs,
         aux_features={},
         initial_correlation_times=initial_correlation_times,
         initial_correlation_lengths=initial_correlation_lengths,
         variances=variances,
         field_subset=field_subset,
+        n_fixed_fields=n_fixed_fields,
     )
+
+  def nondimensionalize(self, x):
+    return stochastic.nondimensionalize(x, self.physics_specs)
 
   @parameterized.named_parameters(
       dict(
@@ -482,6 +487,13 @@ class BatchGaussianRandomFieldModuleTest(BaseRandomFieldTest):
           variances=(1.0, 2.7),
           initial_correlation_lengths=(0.15, 0.2),
           initial_correlation_times=(1, 2.1),
+      ),
+      dict(
+          testcase_name='one_fixed_field',
+          variances=(1.0, 2.7),
+          initial_correlation_lengths=(0.15, 0.2),
+          initial_correlation_times=(1, 2.1),
+          n_fixed_fields=1,
       ),
       dict(
           testcase_name='reasonable_corrs_skip_middle',
@@ -499,6 +511,7 @@ class BatchGaussianRandomFieldModuleTest(BaseRandomFieldTest):
       initial_correlation_lengths,
       initial_correlation_times,
       field_subset=None,
+      n_fixed_fields=None,
   ):
     unroll_length = 10
 
@@ -510,8 +523,9 @@ class BatchGaussianRandomFieldModuleTest(BaseRandomFieldTest):
           initial_correlation_times=initial_correlation_times,
           # Do not specify the field names... Let the default naming happen.
           field_subset=field_subset,
+          n_fixed_fields=n_fixed_fields,
       )
-      sample = grf.unconditional_sample(key)
+      initial_value = grf.unconditional_sample(key)
 
       def step_fn(c, _):
         next_c = grf.advance(c)
@@ -519,14 +533,15 @@ class BatchGaussianRandomFieldModuleTest(BaseRandomFieldTest):
         return (next_c, next_output)
 
       _, trajectory = jax.lax.scan(
-          step_fn, sample, xs=None, length=unroll_length
+          step_fn, initial_value, xs=None, length=unroll_length
       )
-      return sample, jax.device_get(trajectory)
+      return initial_value, jax.device_get(trajectory)
 
+    n_fixed_fields = n_fixed_fields or 0
     n_samples = 2000
     rngs = jax.random.split(jax.random.PRNGKey(802701), n_samples)
     params = make_field_trajectory.init(rng=rngs[0], key=rngs[0])
-    sample, trajectory = jax.vmap(
+    initial_value, trajectory = jax.vmap(
         lambda rng: make_field_trajectory.apply(params, rng, rng)
     )(rngs)
 
@@ -546,15 +561,15 @@ class BatchGaussianRandomFieldModuleTest(BaseRandomFieldTest):
 
     self.assertEqual(
         (n_samples, n_fields) + self.coords.horizontal.modal_shape,
-        sample.core.shape,
+        initial_value.core.shape,
     )
     self.assertEqual(
         (n_samples, n_fields) + self.coords.horizontal.modal_shape,
-        sample.modal_value.shape,
+        initial_value.modal_value.shape,
     )
     self.assertEqual(
         (n_samples, n_fields) + self.coords.horizontal.nodal_shape,
-        sample.nodal_value.shape,
+        initial_value.nodal_value.shape,
     )
 
     # Check stochastic params were initialized with hk parameters.
@@ -566,9 +581,18 @@ class BatchGaussianRandomFieldModuleTest(BaseRandomFieldTest):
         ['correlation_times_raw', 'correlation_lengths_raw'],
         params['batch_gaussian_random_field_module'].keys(),
     )
+    for name in ['correlation_times_raw', 'correlation_lengths_raw']:
+      self.assertEqual(
+          (n_fields - n_fixed_fields,),
+          params['batch_gaussian_random_field_module'][name].shape,
+      )
 
     # Core should be modal
-    tree_map(np.testing.assert_array_equal, sample.core, sample.modal_value)
+    tree_map(
+        np.testing.assert_array_equal,
+        initial_value.core,
+        initial_value.modal_value,
+    )
 
     # Nodal values should have the right statistics.
     for i, (variance, correlation_length) in enumerate(
@@ -578,7 +602,7 @@ class BatchGaussianRandomFieldModuleTest(BaseRandomFieldTest):
             strict=True,
         )
     ):
-      for x in [sample.nodal_value, final_nodal_value]:
+      for x in [initial_value.nodal_value, final_nodal_value]:
         self.check_mean(
             x[:, i],
             self.coords,
@@ -615,8 +639,103 @@ class BatchGaussianRandomFieldModuleTest(BaseRandomFieldTest):
     # Initial and final sample should be independent as well, since we unroll
     # for much longer than the correlation time.
     self.check_independent(
-        sample.nodal_value[:, 0, 50:55, 60], final_nodal_value[:, 0, 50:55, 60]
+        initial_value.nodal_value[:, 0, 50:55, 60],
+        final_nodal_value[:, 0, 50:55, 60],
     )
+
+  def test_giant_correlations_give_constant_fields(self):
+    unroll_length = 10
+
+    initial_correlation_lengths = [
+        # Include a moderate correlation batch member just to check that extreme
+        # correlations in other batch members don't mess this up.
+        0.2,
+        # Include the default "CONSTANT" correlations
+        f'{stochastic.CONSTANT_CORRELATION_LENGTH_KM} km',
+        # Include a much larger correlation, to check for numerical stability.
+        f'{1000 * stochastic.CONSTANT_CORRELATION_LENGTH_KM} km',
+    ]
+    initial_correlation_times = [
+        1,
+        f'{stochastic.CONSTANT_CORRELATION_TIME_HRS} hours',
+        f'{1000 * stochastic.CONSTANT_CORRELATION_TIME_HRS} hours',
+    ]
+    variances = [1., 1., 1.]
+
+    @hk.transform
+    def make_field_trajectory(key):
+      grf = self._make_grf(
+          variances=variances,
+          initial_correlation_lengths=initial_correlation_lengths,
+          initial_correlation_times=initial_correlation_times,
+          # Do not specify the field names... Let the default naming happen.
+      )
+      initial_value = grf.unconditional_sample(key)
+
+      def step_fn(c, _):
+        next_c = grf.advance(c)
+        next_output = next_c.nodal_value
+        return (next_c, next_output)
+
+      _, trajectory = jax.lax.scan(
+          step_fn, initial_value, xs=None, length=unroll_length
+      )
+      return initial_value, jax.device_get(trajectory)
+
+    n_samples = 100
+    rngs = jax.random.split(jax.random.PRNGKey(802701), n_samples)
+    params = make_field_trajectory.init(rng=rngs[0], key=rngs[0])
+    initial_value, trajectory = jax.vmap(
+        lambda rng: make_field_trajectory.apply(params, rng, rng)
+    )(rngs)
+    final_nodal_value = trajectory[:, -1]
+    initial_nodal_value = initial_value.nodal_value
+
+    self.assertTrue(np.all(np.isfinite(initial_nodal_value)))
+    self.assertTrue(np.all(np.isfinite(final_nodal_value)))
+
+    # All fields have the correct mean and variance.
+    for i in range(3):
+      for x in [initial_value.nodal_value, final_nodal_value]:
+        self.check_mean(
+            x[:, i],
+            self.coords,
+            expected_mean=0.0,
+            variance=variances[i],
+            correlation_length=self.nondimensionalize(
+                initial_correlation_lengths[i]),
+            mean_tol_in_standard_errs=5,
+        )
+        self.check_variance(
+            x[:, i],
+            self.coords,
+            correlation_length=self.nondimensionalize(
+                initial_correlation_lengths[i]
+            ),
+            expected_variance=variances[i],
+            var_tol_in_standard_errs=5,
+        )
+
+    # Field 0 (moderate correlation) has correct correlation length.
+    for x in [initial_value.nodal_value, final_nodal_value]:
+      self.check_correlation_length(
+          x[:, 0],
+          expected_correlation_length=initial_correlation_lengths[0],
+          coords=self.coords,
+      )
+
+    # The variation in index 0 (moderate correlation) is much larger than that
+    # in index 1 (CONSTANT_CORRELATION_*) or 2.
+    # This checks the correlation length/time of fields 1, 2 is huge.
+    diff = final_nodal_value - initial_nodal_value
+    for i in [1, 2]:
+      self.assertGreater(  # Variation in time
+          np.max(np.abs(diff[:, 0])), 100 * np.max(np.abs(diff[:, i]))
+      )
+      self.assertGreater(  # Variation in lat/lon
+          np.std(initial_nodal_value[:, 0], axis=(-1, -2)).max(),
+          10000 * np.std(initial_nodal_value[:, i], axis=(-1, -2)).max(),
+      )
 
 
 class DictOfGaussianRandomFieldModulesTest(BaseRandomFieldTest):
