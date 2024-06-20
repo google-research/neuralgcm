@@ -450,7 +450,7 @@ class HardClip(hk.Module):
     del coords, dt, physics_specs, aux_features  # unused.
     super().__init__(name=name)
     self.clip_fn = functools.partial(
-        jnp.clip, a_min=-max_value, a_max=max_value)
+        jnp.clip, min=-max_value, max=max_value)
 
   def __call__(self, inputs: typing.Pytree) -> typing.Pytree:
     return jax.tree_util.tree_map(self.clip_fn, inputs)
