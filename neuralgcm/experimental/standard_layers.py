@@ -47,6 +47,9 @@ class UnaryLayer(Protocol):
     ...
 
 
+UnaryLayerFactory = Callable[..., UnaryLayer]
+
+
 class Mlp(nnx.Module):
   """Multi-layer-perceptron modules with flexible layer sizes."""
 
