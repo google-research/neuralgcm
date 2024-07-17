@@ -390,7 +390,7 @@ class SurfacePressureDiagnostics:
       physics_tendencies: typing.Pytree,
       forcing: typing.Forcing | None = None,
   ) -> typing.Pytree:
-    """Computes preciptable water."""
+    """Computes surface pressure."""
     del physics_tendencies, forcing  # unused
     lsp = model_state.state.log_surface_pressure
     surface_pressure = jnp.squeeze(jnp.exp(self.to_nodal_fn(lsp)), axis=0)
