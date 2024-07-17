@@ -368,3 +368,30 @@ class EvaporationPrecipitationDiagnostics(
           ' `rate`/`cumulative`'
       )
     return output_dict
+
+
+@gin.register
+class SurfacePressureDiagnostics:
+  """Getting the surface pressure of the state."""
+
+  def __init__(
+      self,
+      coords: coordinate_systems.CoordinateSystem,
+      dt: float,
+      physics_specs: Any,
+      aux_features: dict[str, Any],
+  ):
+    del dt, aux_features, physics_specs
+    self.to_nodal_fn = coords.horizontal.to_nodal
+
+  def __call__(
+      self,
+      model_state: typing.ModelState,
+      physics_tendencies: typing.Pytree,
+      forcing: typing.Forcing | None = None,
+  ) -> typing.Pytree:
+    """Computes preciptable water."""
+    del physics_tendencies, forcing  # unused
+    lsp = model_state.state.log_surface_pressure
+    surface_pressure = jnp.squeeze(jnp.exp(self.to_nodal_fn(lsp)), axis=0)
+    return {'surface_pressure': surface_pressure}
