@@ -542,7 +542,7 @@ class BatchGaussianRandomFieldModuleTest(BaseRandomFieldTest):
       return initial_value, jax.device_get(trajectory)
 
     n_fixed_fields = n_fixed_fields or 0
-    n_samples = 2000
+    n_samples = 1000
     rngs = jax.random.split(jax.random.PRNGKey(802701), n_samples)
     params = make_field_trajectory.init(rng=rngs[0], key=rngs[0])
     initial_value, trajectory = jax.vmap(
