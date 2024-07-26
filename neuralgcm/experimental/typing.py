@@ -27,7 +27,7 @@ import tree_math
 # Generic types.
 #
 Dtype = jax.typing.DTypeLike | Any
-Array = np.ndarray | jnp.ndarray | jax.Array
+Array = np.ndarray | jax.Array
 Numeric = float | int | Array
 Timestep = np.timedelta64 | float
 PRNGKeyArray = jax.Array
@@ -50,6 +50,7 @@ class ModelState(Generic[PyTreeState]):
     diagnostics: Optional diagnostic values holding diagnostic information.
     randomness: Optional randomness state describing stochasticity of the model.
   """
+
   prognostics: PyTreeState
   diagnostics: Pytree = dataclasses.field(default_factory=dict)
   randomness: Pytree = dataclasses.field(default_factory=dict)
@@ -59,6 +60,7 @@ class ModelState(Generic[PyTreeState]):
 @dataclasses.dataclass
 class Randomness:
   """State describing the random process."""
+
   prng_key: jax.Array
   prng_step: int = 0
   core: Pytree = None
@@ -75,6 +77,62 @@ class Randomness:
     return cls(*leaves, *aux_data)
 
 
+@jax.tree_util.register_pytree_node_class
+@dataclasses.dataclass
+class Timedelta:
+  """JAX compatible time duration, stored in days and seconds.
+
+  Like datetime.timedelta, the Timedelta constructor and arithmetic operations
+  normalize seconds to fall in the range [0, 24 * 60 * 60). Timedelta objects
+  are pytrees, but normalization is skipped inside jax.tree operations because
+  JAX uses pytrees with non-numeric types to implement JAX transformations.
+
+  Using integer days and seconds is recommended to avoid loss of precision. With
+  int32 days, Timedelta can exactly represent durations over 5 million years.
+  """
+
+  days: Numeric = 0
+  seconds: Numeric = 0
+
+  # TODO(shoyer): can we rewrite this a custom JAX dtype, like jax.random.key?
+
+  def __post_init__(self):
+    days_delta, seconds = divmod(self.seconds, 24 * 60 * 60)
+    self.days = self.days + days_delta
+    self.seconds = seconds
+
+  def __add__(self, other):
+    if type(other) is not Timedelta:  # pylint: disable=unidiomatic-typecheck
+      return NotImplemented
+    days = self.days + other.days
+    seconds = self.seconds + other.seconds
+    return Timedelta(days, seconds)
+
+  def __mul__(self, other):
+    if not isinstance(other, Numeric):
+      return NotImplemented
+    return Timedelta(self.days * other, self.seconds * other)
+
+  __rmul__ = __mul__
+
+  # TODO(shoyer): consider adding other methods supported by datetime.timedelta.
+
+  def tree_flatten(self):
+    leaves = (self.days, self.seconds)
+    aux_data = None
+    return leaves, aux_data
+
+  @classmethod
+  def tree_unflatten(cls, aux_data, leaves):
+    assert aux_data is None
+    # JAX uses non-numeric values for pytree leaves inside transformations, so
+    # we skip __post_init__ by constructing the object directly:
+    # https://jax.readthedocs.io/en/latest/pytrees.html#custom-pytrees-and-initialization
+    result = object.__new__(cls)
+    result.days, result.seconds = leaves
+    return result
+
+
 #
 # API function signatures.
 #
@@ -87,5 +145,6 @@ PostProcessFn = Callable[..., Any]
 @dataclasses.dataclass(eq=True, order=True, frozen=True)
 class KeyWithCosLatFactor:
   """Class describing a key by `name` and an integer `factor_order`."""
+
   name: str
   factor_order: int
