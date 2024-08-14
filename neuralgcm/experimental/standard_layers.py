@@ -20,6 +20,7 @@ import jax
 import jax.numpy as jnp
 from neuralgcm.experimental import typing
 
+Array = typing.Array
 
 default_w_init = nnx.initializers.lecun_normal()
 default_b_init = nnx.initializers.zeros_init()
@@ -303,3 +304,46 @@ class CnnLevel(nnx.Module):
       if i < (num_layers - 1) or self.activate_final:
         out = self.activation(out)
     return out
+
+
+class ConvLonLat(nnx.Module):
+  """Two dimensional convolutional neural network.
+
+  Inputs of convention channel, lon, lat.
+  """
+
+  def __init__(
+      self,
+      input_size: int,
+      output_size: int,
+      *,
+      use_bias: bool = True,
+      kernel_size: tuple[int, int] = (3, 3),
+      dilation: int = 1,
+      rngs: nnx.Rngs,
+  ):
+    self.conv_layer = nnx.Conv(
+        in_features=input_size,
+        out_features=output_size,
+        kernel_size=kernel_size,
+        rngs=rngs,
+        padding='valid',
+        kernel_dilation=dilation,
+        use_bias=use_bias,
+    )
+    self.pad_size = int((kernel_size[0] - 1) / 2 * dilation)
+
+  def __call__(self, inputs: Array) -> Array:
+    inputs = jnp.moveaxis(jnp.expand_dims(inputs, axis=0), 1, -1)
+    inputs = jnp.pad(
+        inputs,
+        ((0, 0), (self.pad_size, self.pad_size), (0, 0), (0, 0)),
+        mode='wrap',
+    )
+    inputs = jnp.pad(
+        inputs,
+        ((0, 0), (0, 0), (self.pad_size, self.pad_size), (0, 0)),
+        mode='reflect',
+    )
+    outputs = self.conv_layer(inputs).squeeze(axis=0)
+    return jnp.moveaxis(outputs, -1, 0)

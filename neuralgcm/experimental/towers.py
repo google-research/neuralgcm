@@ -14,12 +14,14 @@
 """Modules that define stacks of neural-net layers acting on spatial arrays."""
 
 import functools
+import itertools
 from typing import Callable, Protocol, Sequence
 
 from flax import nnx
 import jax
+import jax.numpy as jnp
+from neuralgcm.experimental import standard_layers
 from neuralgcm.experimental import typing
-
 
 Array = typing.Array
 
@@ -66,7 +68,8 @@ class ColumnTower(nnx.Module):
   def __call__(self, inputs: Array) -> Array:
     """Applies Column tower to inputs."""
     vmap = functools.partial(
-        nnx.vmap, in_axes=-1, out_axes=-1, state_axes={}, split_rngs=False)
+        nnx.vmap, in_axes=-1, out_axes=-1, state_axes={}, split_rngs=False
+    )
     mapped_column_net = vmap(vmap(self.column_network))
     if self.apply_remat:
       mapped_column_net = nnx.remat(mapped_column_net)
@@ -152,3 +155,186 @@ class ChainedTower(nnx.Module):
     for tower in self.towers:
       current = tower(current)
     return current
+
+
+class ConvLonLatTower(nnx.Module):
+  """Two dimensional ConvNet tower module."""
+
+  def __init__(
+      self,
+      input_size: int,
+      output_size: int,
+      *,
+      num_hidden_units: int,
+      num_hidden_layers: int,
+      kernel_size: tuple[int, int] = (3, 3),
+      dilation: int = 1,
+      activation: Callable[[jnp.ndarray], jnp.ndarray] = jax.nn.gelu,
+      use_bias: bool = True,
+      activate_final: bool = False,
+      apply_remat: bool = False,
+      rngs: nnx.Rngs,
+  ):
+    self.apply_remat = apply_remat
+    self.activation = activation
+    self.activate_final = activate_final
+    self.num_hidden_layers = num_hidden_layers
+    self.conv_layers = []
+    self.conv_layers.append(
+        standard_layers.ConvLonLat(
+            input_size=input_size,
+            output_size=num_hidden_units,
+            use_bias=use_bias,
+            kernel_size=kernel_size,
+            dilation=dilation,
+            rngs=rngs,
+        )
+    )
+    for _ in range(num_hidden_layers):
+      self.conv_layers.append(
+          standard_layers.ConvLonLat(
+              input_size=num_hidden_units,
+              output_size=num_hidden_units,
+              use_bias=use_bias,
+              kernel_size=kernel_size,
+              dilation=dilation,
+              rngs=rngs,
+          )
+      )
+    self.conv_layers.append(
+        standard_layers.ConvLonLat(
+            input_size=num_hidden_units,
+            output_size=output_size,
+            use_bias=use_bias,
+            kernel_size=kernel_size,
+            dilation=dilation,
+            rngs=rngs,
+        )
+    )
+
+  def apply(self, inputs: Array) -> Array:
+    for i, layer in enumerate(self.conv_layers):
+      inputs = layer(inputs)
+      if i != self.num_hidden_layers + 1 or self.activate_final:
+        inputs = self.activation(inputs)
+    return inputs
+
+  def __call__(self, inputs: Array) -> Array:
+    apply_fn = self.apply
+    if self.apply_remat:
+      apply_fn = nnx.remat(apply_fn)
+    return apply_fn(inputs)
+
+
+class ResNet(nnx.Module):
+  """A ResNet tower module that uses ConvLonLatTower for each block.
+
+  input size: number of input channels.
+  output size: number of output channels.
+
+  conv_block_num_channels: number of channels for output of the intermediate and
+    final layer of conv block components.
+
+  conv_block_num_hidden_layers: number of hidden layers in each conv block.
+  kernel size: tuple of convolutional kernel used in all layers.
+  dilations: tuple of dilations used if an int is passed all layers will use the
+    same dilation.
+
+  activation: activation function throughout the tower and subcomponents.
+  use_bias: whether to use bias.
+  apply_remat: whether to apply rematerialization during training.
+  num_hidden_layers_skip_residual: from the final layer, how many additional
+    layers to skip passing the residual connection.
+  """
+
+  def __init__(
+      self,
+      input_size: int,
+      output_size: int,
+      *,
+      conv_block_num_channels: tuple[int, ...],
+      conv_block_num_hidden_layers: int = 0,
+      kernel_size: tuple[int, int] = (3, 3),
+      dilations: int | tuple[int, ...] = 1,
+      activation: Callable[[jnp.ndarray], jnp.ndarray] = jax.nn.gelu,
+      use_bias: bool = True,
+      apply_remat: bool = False,
+      num_hidden_layers_skip_residual: int = 0,
+      rngs: nnx.Rngs,
+  ):
+
+    if isinstance(dilations, int):
+      dilations = tuple([dilations] * (len(conv_block_num_channels) + 1))
+
+    in_through_hidden_channels = (input_size,) + conv_block_num_channels
+    self.num_hidden_layers_skip_residual = num_hidden_layers_skip_residual
+    self.activation = activation
+    self.apply_remat = apply_remat
+
+    self.convolutional_blocks = []
+    self.projection_blocks = []
+    for dilation, (din, dout) in zip(
+        dilations[:-1],
+        itertools.pairwise(in_through_hidden_channels),
+        strict=True,
+    ):
+      self.convolutional_blocks.append(
+          ConvLonLatTower(
+              input_size=din,
+              output_size=dout,
+              num_hidden_units=dout,
+              num_hidden_layers=conv_block_num_hidden_layers,
+              use_bias=use_bias,
+              kernel_size=kernel_size,
+              dilation=dilation,
+              activation=activation,
+              activate_final=False,
+              rngs=rngs,
+          )
+      )
+      if din != dout:
+        self.projection_blocks.append(
+            standard_layers.ConvLonLat(
+                input_size=din,
+                output_size=dout,
+                use_bias=False,
+                kernel_size=(1, 1),
+                dilation=1,
+                rngs=rngs,
+            )
+        )
+      else:
+        self.projection_blocks.append(lambda x: x)
+
+    self.final_convolutional_block = ConvLonLatTower(
+        input_size=conv_block_num_channels[-1],
+        output_size=output_size,
+        num_hidden_units=output_size,
+        num_hidden_layers=conv_block_num_hidden_layers,
+        use_bias=use_bias,
+        kernel_size=kernel_size,
+        dilation=dilations[-1],
+        activation=activation,
+        activate_final=False,
+        rngs=rngs,
+    )
+
+  def apply(self, inputs: Array) -> Array:
+    carry = inputs
+    for i, (convolution, projection) in enumerate(
+        zip(self.convolutional_blocks, self.projection_blocks)
+    ):
+      residual_connection = projection(carry)
+      carry = convolution(carry)
+      if i < len(self.projection_blocks) - self.num_hidden_layers_skip_residual:
+        carry += residual_connection
+      carry = self.activation(carry)
+
+    carry = self.final_convolutional_block(carry)
+    return carry
+
+  def __call__(self, inputs: Array) -> Array:
+    apply_fn = self.apply
+    if self.apply_remat:
+      apply_fn = nnx.remat(apply_fn)
+    return apply_fn(inputs)

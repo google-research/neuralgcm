@@ -210,6 +210,114 @@ class StandardLayersTest(parameterized.TestCase):
       actual = sum([np.prod(x.shape) for x in jax.tree.leaves(params)])
       self.assertEqual(actual, expected)
 
+  @parameterized.parameters(
+      dict(
+          input_size=1,
+          input_lonlat_shape=(54, 54),
+          output_size=1,
+          kernel_size=(5, 5),
+          dilation=1,
+          use_bias=True,
+      ),
+      dict(
+          input_size=2,
+          input_lonlat_shape=(54, 27),
+          output_size=1,
+          kernel_size=(3, 3),
+          dilation=4,
+          use_bias=False,
+      ),
+      dict(
+          input_size=6,
+          input_lonlat_shape=(33, 87),
+          output_size=5,
+          kernel_size=(3, 3),
+          dilation=2,
+          use_bias=True,
+      ),
+  )
+  def test_conv_lon_lat(
+      self,
+      input_size: int,
+      input_lonlat_shape: tuple[int, int],
+      output_size: int,
+      kernel_size: tuple[int, int],
+      dilation: int,
+      use_bias: bool,
+  ):
+    conv_layer = standard_layers.ConvLonLat(
+        input_size=input_size,
+        output_size=output_size,
+        kernel_size=kernel_size,
+        dilation=dilation,
+        use_bias=use_bias,
+        rngs=nnx.Rngs(0),
+    )
+    params = nnx.state(conv_layer, nnx.Param)
+
+    with self.subTest('output_shape'):
+      inputs = jnp.ones((input_size,) + input_lonlat_shape)
+      outputs = conv_layer(inputs)
+      self.assertEqual(outputs.shape, (output_size,) + inputs.shape[1:])
+
+    with self.subTest('total_params_count'):
+      expected = count_conv_params(
+          input_size, kernel_size, output_size, use_bias
+      )
+      actual = sum([np.prod(x.shape) for x in jax.tree.leaves(params)])
+      np.testing.assert_allclose(actual, expected)
+      self.assertEqual(actual, expected)
+
+  @parameterized.parameters(
+      dict(
+          lon_lat_shape=(10, 10),
+      ),
+      dict(
+          lon_lat_shape=(15, 17),
+      ),
+  )
+  def test_conv_lon_lat_padding(self, lon_lat_shape: tuple[int, int]):
+    conv = standard_layers.ConvLonLat(
+        input_size=1,
+        output_size=1,
+        kernel_size=(3, 3),
+        dilation=1,
+        use_bias=False,
+        rngs=nnx.Rngs(0),
+    )
+    lon_size, lat_size = lon_lat_shape
+
+    test_in_wrap = jnp.broadcast_to(
+        jnp.arange(lon_size, dtype=float)[:, jnp.newaxis],
+        (1,) + lon_lat_shape,  # arange repeated along longitude.
+    )
+
+    test_in_reflect = jnp.broadcast_to(
+        jnp.arange(lat_size, dtype=float)[jnp.newaxis, :],
+        (1,) + lon_lat_shape,  # arange repeated along latitude.
+    )
+
+    with self.subTest('wrap_padding'):
+      kernel_select_above = jnp.expand_dims(
+          jnp.array([[0.0, 1.0, 0.0],
+                     [0.0, 0.0, 0.0],
+                     [0.0, 0.0, 0.0]]),
+          axis=(-1, -2),
+      )
+      conv.conv_layer.kernel.value = kernel_select_above
+      output = conv(test_in_wrap)
+      np.testing.assert_allclose(output[:, 0], test_in_wrap[:, -1])
+    with self.subTest('reflect_padding'):
+      kernel_select_left = jnp.expand_dims(
+          jnp.array([[0.0, 0.0, 0.0],
+                     [1.0, 0.0, 0.0],
+                     [0.0, 0.0, 0.0]]),
+          axis=(-1, -2),
+      )
+      conv.conv_layer.kernel.value = kernel_select_left
+      output = conv(test_in_reflect)
+      np.testing.assert_allclose(output[:, :, 0], test_in_reflect[:, :, 1])
+
 
 def count_mlp_uniform_params(
     input_size: int,
