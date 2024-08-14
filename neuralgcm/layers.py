@@ -239,7 +239,6 @@ class LevelTransformer(hk.Module):
     key_size: size of key/query vectors to use for computing attention scores.
     widening_factor: widening factor in dense layer at the end of each block.
     activation: activation function to apply between linear transforms.
-    final_activation: optional activation to be applied to the output.
     input_projection_net: network or layer to be used to project inputs into
       initial latent representation. If set to `None`, then input projection is
       skipped entirely (only possible if input size == latent_size).
@@ -357,5 +356,88 @@ class LevelTransformer(hk.Module):
         h_dense = dense_block(self.layer_norm(h))
 
     h_dense = self.final_projection(h)
+    h_dense = jnp.transpose(h_dense)  # transpose back to [channels, levels].
+    return h_dense
+
+
+@gin.register(denylist=['output_size'])
+class LevelBiLSTM(hk.Module):
+  """Applies a bidirectional LSTM to inputs.
+
+    This network is a bi-directional LSTM. This module accepts additional
+    optional argument, window_size which determines the number of positional
+    features the LSTM will use at each step. By default this argument have
+    value `1`, in which case the network uses features from a single level at
+    each step.
+
+  Attributes:
+    output_size: desired number of channels in the output of the module.
+    hidden_size: size of the hidden state in the LSTM.
+    n_layers: number of bi-directional LSTM layers in the network.
+    final_activation: optional activation to be applied to the output.
+    window_size: number of (local) features the LSTM will use at each step.
+    name: optional name for the module.
+  """
+  def __init__(
+      self,
+      output_size: int,
+      hidden_size: int = gin.REQUIRED,
+      n_layers: int = gin.REQUIRED,
+      final_activation: Optional[Callable[[jnp.ndarray], jnp.ndarray]] = None,
+      window_size: int = 1,
+      name='lstm'):
+    super().__init__(name=name)
+    self.hidden_size = hidden_size
+    self.n_layers = n_layers
+    self.final_projection = hk.Linear(output_size)
+    self.final_activation = final_activation
+    self.window_size = window_size
+
+    self.fw_lstms = []
+    self.bw_lstms = []
+    for i in range(n_layers):
+      self.fw_lstms.append(hk.LSTM(hidden_size, name=f"{name}_fw_{i}"))
+      self.bw_lstms.append(hk.LSTM(hidden_size, name=f"{name}_bw_{i}"))
+
+  def sliding_window_reshape(self, data):
+    """Reshapes data to include local vertical features."""
+    levels_num = data.shape[0]
+    pad_start = (self.window_size - 1) // 2
+    pad_end = self.window_size - 1 - pad_start
+    padded_data = jnp.pad(data, [(pad_start, pad_end)] + [(0, 0)])
+    feature_indices = (
+        jnp.arange(self.window_size)[jnp.newaxis, :]
+        + jnp.arange(levels_num)[:, jnp.newaxis]
+    )
+    windowed_data = padded_data[feature_indices, ...]
+    windowed_data = jnp.reshape(
+        windowed_data,
+        [
+            windowed_data.shape[0],
+            windowed_data.shape[2] * windowed_data.shape[1],
+        ],
+    )
+    return windowed_data
+
+  def __call__(self, inputs):
+    inputs = jnp.transpose(inputs)  # transpose to [levels, channels].
+    if self.window_size > 1:
+      inputs = self.sliding_window_reshape(inputs)
+    for i in range(self.n_layers):
+      #TODO(janniyuval): initializing from previous hidden state?
+      fw_initial_state = self.fw_lstms[i].initial_state(None)
+      bw_initial_state = self.bw_lstms[i].initial_state(None)
+
+      fw_outputs, _ = hk.dynamic_unroll(
+          self.fw_lstms[i], inputs, fw_initial_state
+      )
+      bw_outputs, _ = hk.dynamic_unroll(
+          self.bw_lstms[i], inputs, bw_initial_state, reverse=True
+      )
+      outputs = jnp.concatenate([fw_outputs, bw_outputs], axis=-1)
+      inputs = outputs
+    h_dense = self.final_projection(outputs)
+    if self.final_activation is not None:
+      h_dense = self.final_activation(h_dense)
     h_dense = jnp.transpose(h_dense)  # transpose back to [channels, levels].
     return h_dense
