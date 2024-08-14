@@ -352,6 +352,37 @@ class FilterFromTransform(hk.Module):
     return self.transform_fn(u_next)
 
 
+@gin.register
+class FixGlobalMeanFilter(hk.Module):
+  """Filter that removes the change in the global mean of certain keys."""
+
+  def __init__(
+      self,
+      coords: coordinate_systems.CoordinateSystem,
+      dt: float,
+      physics_specs: Any,
+      aux_features: Dict[str, Any],
+      keys: tuple[str, ...] = ('log_surface_pressure',),
+      name: Optional[str] = None,
+  ):
+    del aux_features  # unused.
+    super().__init__(name=name)
+    self.keys = keys
+
+  def __call__(
+      self, u: typing.PyTreeState, u_next: typing.PyTreeState
+  ) -> typing.PyTreeState:
+    u_dict, _ = pytree_utils.as_dict(u)
+    u_dict, _ = pytree_utils.flatten_dict(u_dict)
+    u_next_dict, from_dict_fn = pytree_utils.as_dict(u_next)
+    u_next_dict, _ = pytree_utils.flatten_dict(u_next_dict)
+    for key in self.keys:
+      global_mean = u_dict[key][..., 0]
+      u_next_dict[key] = u_next_dict[key].at[..., 0].set(global_mean)
+    u_next_dict = pytree_utils.unflatten_dict(u_next_dict)
+    return from_dict_fn(u_next_dict)
+
+
 #  =============================================================================
 #  Filters that act on modal variables without time-step context.
 #  =============================================================================
