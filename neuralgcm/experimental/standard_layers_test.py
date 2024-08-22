@@ -299,9 +299,7 @@ class StandardLayersTest(parameterized.TestCase):
 
     with self.subTest('wrap_padding'):
       kernel_select_above = jnp.expand_dims(
-          jnp.array([[0.0, 1.0, 0.0],
-                     [0.0, 0.0, 0.0],
-                     [0.0, 0.0, 0.0]]),
+          jnp.array([[0.0, 1.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]),
           axis=(-1, -2),
       )
       conv.conv_layer.kernel.value = kernel_select_above
@@ -309,14 +307,50 @@ class StandardLayersTest(parameterized.TestCase):
       np.testing.assert_allclose(output[:, 0], test_in_wrap[:, -1])
     with self.subTest('reflect_padding'):
       kernel_select_left = jnp.expand_dims(
-          jnp.array([[0.0, 0.0, 0.0],
-                     [1.0, 0.0, 0.0],
-                     [0.0, 0.0, 0.0]]),
+          jnp.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 0.0]]),
           axis=(-1, -2),
       )
       conv.conv_layer.kernel.value = kernel_select_left
       output = conv(test_in_reflect)
       np.testing.assert_allclose(output[:, :, 0], test_in_reflect[:, :, 1])
+
+  @parameterized.parameters(
+      dict(
+          mode='upsample',
+          resize_ratio=(2, 2),
+          method='bilinear',
+      ),
+      dict(
+          mode='downsample',
+          resize_ratio=(2, 2),
+          method='bilinear',
+      ),
+      dict(
+          mode='upsample',
+          resize_ratio=(3, 3),
+          method='bilinear',
+      ),
+  )
+  def test_resize_lon_lat(
+      self, resize_ratio: tuple[int, int], mode: str, method: str
+  ):
+    resize_layer = standard_layers.ResizeLonLat(
+        mode=mode,
+        resize_ratio=resize_ratio,
+        method=method,
+    )
+    with self.subTest('output_shape'):
+      inputs = jnp.ones((1, 128, 256))
+      outputs = resize_layer(inputs)
+      if mode == 'upsample':
+        self.assertEqual(
+            outputs.shape,
+            (1, 128 * resize_ratio[0], 256 * resize_ratio[1]),
+        )
+      elif mode == 'downsample':
+        self.assertEqual(
+            outputs.shape, (1, 128 // resize_ratio[0], 256 // resize_ratio[1])
+        )
 
 
 def count_mlp_uniform_params(
