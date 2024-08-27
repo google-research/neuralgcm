@@ -67,13 +67,15 @@ class ColumnTower(nnx.Module):
 
   def __call__(self, inputs: Array) -> Array:
     """Applies Column tower to inputs."""
-    vmap = functools.partial(
-        nnx.vmap, in_axes=-1, out_axes=-1, state_axes={}, split_rngs=False
-    )
-    mapped_column_net = vmap(vmap(self.column_network))
+    vmap = functools.partial(nnx.vmap, in_axes=(None, -1), out_axes=-1)
+
+    def vmap_fn(net, inputs):
+      return net(inputs)
+
+    mapped_column_net = vmap(vmap(vmap_fn))
     if self.apply_remat:
       mapped_column_net = nnx.remat(mapped_column_net)
-    return mapped_column_net(inputs)
+    return mapped_column_net(self.column_network, inputs)
 
 
 class EpdTower(nnx.Module):
