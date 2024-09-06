@@ -16,6 +16,7 @@
 from typing import Callable, Protocol, Sequence
 
 from flax import nnx
+from flax import typing as flax_typing
 import jax
 import jax.numpy as jnp
 from neuralgcm.experimental import typing
@@ -206,7 +207,7 @@ class ConvLevel(nnx.Conv):
       input_dilation: int = 1,
       kernel_dilation: int = 1,
       use_bias: bool = True,
-      precision: nnx.nnx.nn.linear.PrecisionLike = None,
+      precision: flax_typing.PrecisionLike = None,
       w_init: nnx.initializers.Initializer = default_w_init,
       b_init: nnx.initializers.Initializer = default_b_init,
       rngs: nnx.Rngs,
@@ -247,7 +248,7 @@ class CnnLevel(nnx.Module):
       input_dilation: int = 1,
       kernel_dilations: int | Sequence[int] = 1,
       use_bias: bool = True,
-      precision: nnx.nnx.nn.linear.PrecisionLike = None,
+      precision: flax_typing.PrecisionLike = None,
       w_init: nnx.initializers.Initializer = default_w_init,
       b_init: nnx.initializers.Initializer = default_b_init,
       w_init_final: nnx.initializers.Initializer = default_w_init,
