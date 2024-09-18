@@ -30,6 +30,9 @@ import numpy as np
 
 TransformModule = typing.TransformModule
 
+PRECIPITATION = 'precipitation'
+EVAPORATION = 'evaporation'
+
 
 class DiagnosticFn(Protocol):
   """Implements initialization and computation of model diagnostic fields."""
@@ -285,11 +288,11 @@ class EvaporationPrecipitationDiagnostics(
           'specific_cloud_ice_water_content',
           'specific_cloud_liquid_water_content',
       ),
-      feature_name: str = 'evaporation',
+      is_precipitation: bool = True,
       method_precipitation: str = 'cumulative',
       method_evaporation: str = 'rate',
       name: Optional[str] = None,
-      field_name: str = 'precipitation_cumulative',
+      field_name: str = 'precipitation_cumulative_mean',
   ):
     # del aux_features
     super().__init__(name=name)
@@ -300,8 +303,20 @@ class EvaporationPrecipitationDiagnostics(
     self.method_precipitation = method_precipitation
     self.method_evaporation = method_evaporation
     self.to_nodal_fn = coords.horizontal.to_nodal
+    self.is_precipitation = is_precipitation
+    if self.is_precipitation:
+      predicted_name = PRECIPITATION
+      diagnosed_name = EVAPORATION
+    else:
+      predicted_name = EVAPORATION
+      diagnosed_name = PRECIPITATION
 
-    output_shapes = {f'{feature_name}': np.asarray(coords.surface_nodal_shape)}
+    self.predicted_name = predicted_name
+    self.diagnosed_name = diagnosed_name
+
+    output_shapes = {
+        f'{predicted_name}': np.asarray(coords.surface_nodal_shape)
+    }
 
     self.embedding_fn = embedding_module(
         coords, dt, physics_specs, aux_features, output_shapes=output_shapes
@@ -321,12 +336,15 @@ class EvaporationPrecipitationDiagnostics(
     e_minus_p = self._compute_evaporation_minus_precipitation(
         model_state, physics_tendencies
     )
-    evaporation = self.embedding_fn(
+    water_budget = self.embedding_fn(
         model_state.state,
         model_state.memory,
         model_state.diagnostics,
         model_state.randomness,
         forcing,
+    )
+    water_budget[self.diagnosed_name] = (
+        -e_minus_p - water_budget[self.predicted_name]
     )
 
     # Note: In ERA5 mean_evaporation_rate (kg m**-2 s**-1)
@@ -336,15 +354,16 @@ class EvaporationPrecipitationDiagnostics(
     output_dict = {}
     surface_nodal_shape = self.coords.horizontal.nodal_shape
     if self.method_precipitation == 'rate':  # units: length/time
-      output_dict['precipitation_rate'] = (
-          (-e_minus_p - evaporation['evaporation']) / self.water_density
+      output_dict[PRECIPITATION + '_rate'] = (
+          (water_budget[PRECIPITATION]) / self.water_density
       )
     elif self.method_precipitation == 'cumulative':  # units: length
       previous = model_state.diagnostics.get(
           self.field_name, jnp.zeros(surface_nodal_shape)
       )
-      output_dict[self.field_name] = previous - (
-          ((e_minus_p + evaporation['evaporation']) / self.water_density)
+      assert self.field_name == 'precipitation_cumulative_mean', self.field_name
+      output_dict[self.field_name] = previous + (
+          (water_budget[PRECIPITATION] / self.water_density)
           * self.dt
       )
     else:
@@ -353,14 +372,14 @@ class EvaporationPrecipitationDiagnostics(
           ' be `rate`/`cumulative`'
       )
     if self.method_evaporation == 'rate':  # units: mass length**-2 time**-1
-      output_dict['evaporation'] = evaporation['evaporation']
+      output_dict[EVAPORATION] = water_budget[EVAPORATION]
     elif self.method_evaporation == 'cumulative':  # units: length
       previous_evap = model_state.diagnostics.get(
-          'evaporation_cumulative', jnp.zeros(surface_nodal_shape)
+          EVAPORATION + '_cumulative', jnp.zeros(surface_nodal_shape)
       )
-      output_dict['evaporation_cumulative'] = (
+      output_dict[EVAPORATION + '_cumulative'] = (
           previous_evap
-          + (evaporation['evaporation'] / self.water_density) * self.dt
+          + (water_budget[EVAPORATION] / self.water_density) * self.dt
       )
     else:
       raise ValueError(
