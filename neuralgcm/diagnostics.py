@@ -264,7 +264,7 @@ class NodalModelDiagnosticsDecoder:
 
 # TODO(janniyuval) add a decoder that can add some Gaussian noise to evap/precip
 @gin.register
-class EvaporationPrecipitationDiagnostics(
+class PrecipitationDiagnosticsConstrained(
     hk.Module, PrecipitationMinusEvaporationDiagnostics
 ):
   """Predict evaporation and computes cumulative precipitation.
