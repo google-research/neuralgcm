@@ -292,7 +292,7 @@ class PrecipitationDiagnosticsConstrained(
       method_precipitation: str = 'cumulative',
       method_evaporation: str = 'rate',
       name: Optional[str] = None,
-      field_name: str = 'precipitation_cumulative_mean',
+      field_name: str = 'total_precipitation',
   ):
     # del aux_features
     super().__init__(name=name)
@@ -355,16 +355,20 @@ class PrecipitationDiagnosticsConstrained(
     surface_nodal_shape = self.coords.horizontal.nodal_shape
     if self.method_precipitation == 'rate':  # units: length/time
       output_dict[PRECIPITATION + '_rate'] = (
-          (water_budget[PRECIPITATION]) / self.water_density
-      )
+          water_budget[PRECIPITATION]
+      ) / self.water_density
     elif self.method_precipitation == 'cumulative':  # units: length
       previous = model_state.diagnostics.get(
           self.field_name, jnp.zeros(surface_nodal_shape)
       )
-      assert self.field_name == 'precipitation_cumulative_mean', self.field_name
+      # TODO(janniyuval) remove precipitation_cumulative_mean once no models
+      # use it.
+      assert self.field_name in [
+          'total_precipitation',
+          'precipitation_cumulative_mean',
+      ], self.field_name
       output_dict[self.field_name] = previous + (
-          (water_budget[PRECIPITATION] / self.water_density)
-          * self.dt
+          (water_budget[PRECIPITATION] / self.water_density) * self.dt
       )
     else:
       raise ValueError(
