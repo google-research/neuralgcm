@@ -10,3 +10,5 @@ for weather and climate simulation.
 - **License**:
     - Code: [Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0)
     - Trained model weights: [Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International](https://creativecommons.org/licenses/by-nc-sa/4.0/)
+
+To stay up to date on NeuralGCM, **[subscribe to our mailing list](https://groups.google.com/g/neuralgcm-announce)**!
