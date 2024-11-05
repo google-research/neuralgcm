@@ -40,7 +40,7 @@ jobs:
         key: ${{ runner.os }}-pip-${{ hashFiles('**/pyproject.toml') }}
     - name: Install NeuralGCM
       run: |
-        pip install -e .[tests]
+        pip install -e .[tests,experimental]
     - name: Run unit tests
       run: |
         pytest -v neuralgcm

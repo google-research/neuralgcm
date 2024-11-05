@@ -33,3 +33,6 @@ tests = [
     "chex",
     "pytest",
 ]
+experimental = [
+    "flax",
+]

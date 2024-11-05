@@ -154,9 +154,6 @@ RealSphericalHarmonicsWithZeroImag = gin.external_configurable(
     spherical_harmonic.RealSphericalHarmonicsWithZeroImag,
     denylist=['spmd_mesh'],
 )
-ComplexSphericalHarmonics = gin.external_configurable(
-    spherical_harmonic.ComplexSphericalHarmonics
-)
 LayerCoordinates = gin.external_configurable(layer_coordinates.LayerCoordinates)
 SigmaCoordinates = gin.external_configurable(sigma_coordinates.SigmaCoordinates)
 SigmaCoordinatesEquidistant = gin.external_configurable(
