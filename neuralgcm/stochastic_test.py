@@ -445,7 +445,7 @@ class CenteredLognormalRandomFieldTest(BaseRandomFieldTest):
             # does indeed check something useful.
             80
             if grid.total_wavenumbers < 85
-            else 8
+            else 9
         ),
     )
 

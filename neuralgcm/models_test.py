@@ -511,26 +511,19 @@ class NodalModalEncoderDecoderTest(parameterized.TestCase):
 
     with self.subTest('model_state'):
       # check that `encode` produces an expected state.
-      target_lon_k = 2 * model_grid.longitude_wavenumbers - 1
-      target_lat_k = model_grid.total_wavenumbers
-      expected_prognostic_vars = jax.tree_util.tree_map(
-          lambda x: x[:, :target_lon_k, :target_lat_k], initial_modal_state
-      )
-
       model_state = jax.jit(model.encode_fn)(
           params, rng, data_inputs, forcing
       )
       actual_prognostic_vars = model_state.state
       for actual, expected in zip(
-          actual_prognostic_vars.astuple(), expected_prognostic_vars.astuple()
+          actual_prognostic_vars.astuple(), initial_modal_state.astuple()
       ):
         if not isinstance(actual, dict):  # ignore empty dict of tracers.
           np.testing.assert_allclose(actual, expected, atol=1e-4)
 
     with self.subTest('decoded_state'):
       # check that `decode(encode(x))` is close to identity.
-      target_lon_k = 2 * output_grid.longitude_wavenumbers - 1
-      target_lat_k = output_grid.total_wavenumbers
+      target_lon_k, target_lat_k = output_grid.modal_shape
       target_modal_state = jax.tree_util.tree_map(
           lambda x: x[:, :target_lon_k, :target_lat_k],
           initial_modal_state.asdict(),

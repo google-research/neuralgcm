@@ -115,7 +115,8 @@ xarray_to_state_and_dynamic_covariate_data = gin.external_configurable(
 coordinate_system_from_dataset = gin.external_configurable(
     xarray_utils.coordinate_system_from_dataset,
     'coordinate_system_from_dataset',
-    allowlist=['truncation', 'spherical_harmonics_impl'])
+    allowlist=['truncation', 'spherical_harmonics_impl'],
+)
 
 # Register grids and coordinates for instantiation of coordinate systems.
 Grid = gin.external_configurable(
@@ -148,7 +149,7 @@ GridTL255 = gin.external_configurable(
     spherical_harmonic.Grid.TL255, 'GridTL255'
 )
 RealSphericalHarmonics = gin.external_configurable(
-    spherical_harmonic.RealSphericalHarmonics
+    spherical_harmonic.RealSphericalHarmonics,
 )
 RealSphericalHarmonicsWithZeroImag = gin.external_configurable(
     spherical_harmonic.RealSphericalHarmonicsWithZeroImag,
@@ -518,8 +519,8 @@ def trajectory_from_step(
       checkpointing is off by default; turn it on to trade off ~25% increased
       computed for ~25% less memory usage.
     checkpoint_post_process: whether to use `jax.checkpoint` on
-      `post_process_fn`. `checkpoint_post_process` is a no-op if
-      multi-step checkpointing is enabled.
+      `post_process_fn`. `checkpoint_post_process` is a no-op if multi-step
+      checkpointing is enabled.
 
   Returns:
     A function that takes an initial state and returns a tuple consisting of:
@@ -533,8 +534,10 @@ def trajectory_from_step(
     post_process_fn = hk.remat(post_process_fn)
 
   if checkpoint_multistep:
+
     def outer_scan_fn(f, init, xs, length=None):
       return hk.scan(hk.remat(f), init, xs, length=length)
+
   else:
     outer_scan_fn = hk.scan
 
