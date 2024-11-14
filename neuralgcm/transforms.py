@@ -130,12 +130,15 @@ class InverseShiftAndNormalize(hk.Module):
     # an error, as expected. This works because tree_map skips `None` values in
     # the first argument, as long as all dictionary keys match.
     result = jax.tree_util.tree_map(
-        lambda x, y, z: (None if x is None else x * z + y),
-        inputs,
-        shifts,
-        scales,
-        is_leaf=lambda x: x is None,
+      lambda x, y, z: None if x is None else (x * z + y),
+      inputs, 
+      shifts, 
+      scales,
+      is_leaf=lambda x: x is None
     )
+
+    # result = jax.tree_util.tree_map(
+    #     lambda x, y, z: x * z + y, inputs, shifts, scales)
     return from_dict_fn(result)
 
 
@@ -450,7 +453,7 @@ class HardClip(hk.Module):
     del coords, dt, physics_specs, aux_features  # unused.
     super().__init__(name=name)
     self.clip_fn = functools.partial(
-        jnp.clip, min=-max_value, max=max_value)
+        jnp.clip, a_min=-max_value, a_max=max_value)
 
   def __call__(self, inputs: typing.Pytree) -> typing.Pytree:
     return jax.tree_util.tree_map(self.clip_fn, inputs)
