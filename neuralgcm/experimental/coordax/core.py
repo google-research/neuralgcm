@@ -30,6 +30,7 @@ import collections
 import dataclasses
 import functools
 import operator
+import textwrap
 from typing import Any, Callable, Hashable, Mapping, Sequence, TypeAlias, TypeGuard
 
 import jax
@@ -123,13 +124,14 @@ class SelectedAxis(Coordinate, struct.Struct):
     """Dimensionality of the coordinate."""
     return 1
 
+  def __repr__(self):
+    return f'coordax.SelectedAxis({self.coordinate!r}, axis={self.axis})'
+
 
 def combine_slices(*coordinates: Coordinate) -> tuple[Coordinate, ...]:
   """Combines complete slices of a coordinate into a single unsliced object."""
   # TODO(dkochkov): Simplify this implementation.
-  if not coordinates:
-    raise ValueError('No coordinates provided.')
-  if len(coordinates) == 1:
+  if len(coordinates) < 2:
     return coordinates
   current_slice = None
   current_combined = None
@@ -256,6 +258,9 @@ class NamedAxis(Coordinate, struct.Struct):
   def fields(self) -> dict[str, Field]:
     return {}
 
+  def __repr__(self):
+    return f'coordax.NamedAxis({self.axis_name!r}, size={self.size})'
+
 
 # TODO(dkochkov): consider using @struct.pytree_dataclass here and storing
 # tuple values instead of np.ndarray (which could be exposed as a property).
@@ -305,6 +310,12 @@ class LabeledAxis(Coordinate):  # pytype: disable=final-error
 
   def __hash__(self) -> int:
     return hash(self._components())
+
+  def __repr__(self):
+    return (
+        f'coordax.LabeledAxis({self.axis_name!r},'
+        f' tick_values={self.tick_values!r})'
+    )
 
 
 def compose_coordinates(*coordinates: Coordinate) -> Coordinate:
@@ -727,14 +738,8 @@ class Field(struct.Struct):
     else:
       return wrapped
 
-  # TODO(shoyer): __repr__ method, initially based on Field.wrap, e.g.,
-  # Field.wrap(
-  #     array(...),
-  #     NamedAxis("time"),
-  #     LatLonGrid(...),
-  # )
-  #
-  # Eventually, after updating the data model:
+  # TODO(shoyer): after updating the data model, the __repr__ should look like
+  # either:
   #
   # Field(
   #     data=array(...),
@@ -755,6 +760,15 @@ class Field(struct.Struct):
   #         'lat': SelectedAxis(LonLatGrid(...), axis=1),
   #     }
   # )
+
+  def __repr__(self):
+    indent = '    '
+    data_repr = textwrap.indent(repr(self.data), prefix=indent)
+    coordinates = combine_slices(*self.coords.values())
+    coords_repr = indent + f',\n{indent}'.join(
+        repr(c).removeprefix('coordax.') for c in coordinates
+    )
+    return f'coordax.Field.wrap(\n{data_repr},\n{coords_repr},\n)'
 
   # Convenience wrappers: Elementwise infix operators.
   __lt__ = _cmap_with_doc(operator.lt, 'jax.Array.__lt__')

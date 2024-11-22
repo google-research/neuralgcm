@@ -13,6 +13,7 @@
 # limitations under the License.
 import functools
 import operator
+import textwrap
 from typing import Any, Callable
 
 from absl.testing import absltest
@@ -27,7 +28,6 @@ import numpy as np
 
 
 class CoreTest(parameterized.TestCase):
-  """Tests core methods in the coordax API."""
 
   @parameterized.named_parameters(
       dict(
@@ -141,6 +141,21 @@ class CoreTest(parameterized.TestCase):
     """Tests that field binary ops work as expected."""
     actual = op(field_a, field_b)
     testing.assert_fields_allclose(actual=actual, desired=expected_result)
+
+  def test_field_repr(self):
+    expected = textwrap.dedent("""\
+        coordax.Field.wrap(
+            array([[1, 2, 3],
+                   [4, 5, 6]]),
+            NamedAxis('x', size=2),
+            LabeledAxis('y', tick_values=array([7, 8, 9])),
+        )""")
+    actual = coordax.wrap(
+        np.array([[1, 2, 3], [4, 5, 6]]),
+        'x',
+        coordax.LabeledAxis('y', np.array([7, 8, 9])),
+    )
+    self.assertEqual(repr(actual), expected)
 
   @parameterized.named_parameters(
       dict(
