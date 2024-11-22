@@ -1,3 +1,16 @@
+# Copyright 2024 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """Defines ``Field`` and base ``Coordinate`` classes that define coordax API.
 
 ``Coordinate`` objects define a discretization schema, dimension names and
@@ -78,7 +91,7 @@ class ArrayKey:
 
 
 @struct.pytree_dataclass
-class Axis(Coordinate, struct.Struct):
+class SelectedAxis(Coordinate, struct.Struct):
   """Coordinate that exposes one dimension of a multidimensional coordinate."""
 
   coordinate: Coordinate
@@ -123,8 +136,8 @@ def combine_slices(*coordinates: Coordinate) -> tuple[Coordinate, ...]:
   current_slice_idx = 0
   combined_coordinates = []
   for c in coordinates:
-    if not isinstance(c, Axis):
-      if current_slice is not None:  # if were building a slice - add it.
+    if not isinstance(c, SelectedAxis):
+      if current_slice is not None:  # if we're building a slice - add it.
         combined_coordinates.append(current_slice)
       combined_coordinates.append(c)  # add and reset.
       current_slice = None
@@ -132,7 +145,7 @@ def combine_slices(*coordinates: Coordinate) -> tuple[Coordinate, ...]:
       current_slice_idx = 0
       continue
     elif c.coordinate != current_combined:
-      if current_slice is not None:  # if were building a slice - add it.
+      if current_slice is not None:  # if we're building a slice - add it.
         combined_coordinates.append(current_slice)
       if c.axis == 0:  # if first slice - start building a new one.
         current_slice = c
@@ -153,7 +166,7 @@ def combine_slices(*coordinates: Coordinate) -> tuple[Coordinate, ...]:
       else:
         current_slice_idx += 1  # increment building index.
     else:  # have the right coordinate, but not the needed slice.
-      assert isinstance(current_slice, Axis)  # make pytype happy.
+      assert isinstance(current_slice, SelectedAxis)  # make pytype happy.
       combined_coordinates.append(current_slice)
       if c.axis == 0:  # if first slice - start building a new one.
         current_slice = c
@@ -185,7 +198,7 @@ class CartesianProduct(Coordinate, struct.Struct):
         new_coordinates.extend(c.coordinates)
       elif c.ndim > 1:
         for i in range(c.ndim):
-          new_coordinates.append(Axis(c, i))
+          new_coordinates.append(SelectedAxis(c, i))
       else:
         new_coordinates.append(c)
     combined_coordinates = combine_slices(*new_coordinates)
@@ -225,8 +238,8 @@ class CartesianProduct(Coordinate, struct.Struct):
 
 
 @struct.pytree_dataclass
-class NameOnlyCoordinate(Coordinate, struct.Struct):
-  """One dimensional coordinate that only specifies dimension and shape."""
+class NamedAxis(Coordinate, struct.Struct):
+  """One dimensional coordinate that only dimension size."""
 
   axis_name: str = dataclasses.field(metadata={'pytree_node': False})
   size: int = dataclasses.field(metadata={'pytree_node': False})
@@ -244,15 +257,11 @@ class NameOnlyCoordinate(Coordinate, struct.Struct):
     return {}
 
 
-# TODO(dkochkov): coinsider a different name for this class.
-# (too similar to NameOnlyCoordinate)
-
-
 # TODO(dkochkov): consider using @struct.pytree_dataclass here and storing
 # tuple values instead of np.ndarray (which could be exposed as a property).
 @jax.tree_util.register_pytree_node_class
 @dataclasses.dataclass
-class NamedCoordinate(Coordinate):  # pytype: disable=final-error
+class LabeledAxis(Coordinate):  # pytype: disable=final-error
   """One dimensional coordinate with custom coordinate values."""
 
   axis_name: str = dataclasses.field(metadata={'pytree_node': False})
@@ -274,20 +283,20 @@ class NamedCoordinate(Coordinate):  # pytype: disable=final-error
     return (self.axis_name, ArrayKey(self.tick_values))
 
   def tree_flatten(self):
-    """Flattens NamedCoordinate."""
+    """Flattens LabeledAxis."""
     aux_data = self._components()
     return (), aux_data
 
   @classmethod
   def tree_unflatten(cls, aux_data, leaves):
-    """Unflattens NamedCoordinate."""
+    """Unflattens LabeledAxis."""
     del leaves  # unused
     axis_name, array_key = aux_data
     return cls(axis_name=axis_name, tick_values=array_key.value)
 
   def __eq__(self, other):
     return (
-        isinstance(other, NamedCoordinate)
+        isinstance(other, LabeledAxis)
         and self._components() == other._components()
     )
 
@@ -326,7 +335,7 @@ def _validate_matching_coords(
           coordinates.append(c)
       elif axis.ndim > 1:
         for i in range(axis.ndim):
-          coordinates.append(Axis(axis, i))
+          coordinates.append(SelectedAxis(axis, i))
       else:
         coordinates.append(axis)
   for c in coordinates:
@@ -589,9 +598,9 @@ class Field(struct.Struct):
             coords[sub_c.dims[0]] = sub_c
         else:
           for i, dim in enumerate(c.dims):
-            coords[dim] = c if c.ndim == 1 else Axis(c, i)
+            coords[dim] = c if c.ndim == 1 else SelectedAxis(c, i)
       else:
-        coords[c] = NameOnlyCoordinate(str(c), size=tagged_array.named_shape[c])
+        coords[c] = NamedAxis(str(c), size=tagged_array.named_shape[c])
     result = Field(named_array=tagged_array, coords=coords)
     result.check_valid()
     return result
@@ -622,7 +631,7 @@ class Field(struct.Struct):
         for dim in c.dims:
           coords[dim] = c
       else:
-        coords[c] = NameOnlyCoordinate(str(c), size=tagged_array.named_shape[c])
+        coords[c] = NamedAxis(str(c), size=tagged_array.named_shape[c])
     result = Field(named_array=tagged_array, coords=coords)
     result.check_valid()
     return result
@@ -721,7 +730,7 @@ class Field(struct.Struct):
   # TODO(shoyer): __repr__ method, initially based on Field.wrap, e.g.,
   # Field.wrap(
   #     array(...),
-  #     NameOnlyCoordinate("time"),
+  #     NamedAxis("time"),
   #     LatLonGrid(...),
   # )
   #
@@ -730,7 +739,7 @@ class Field(struct.Struct):
   # Field(
   #     data=array(...),
   #     coords=(
-  #         NameOnlyCoordinate("time"),
+  #         NamedAxis("time"),
   #         LatLonGrid(...),
   #     ),
   # )
@@ -741,9 +750,9 @@ class Field(struct.Struct):
   #     data=array(...),
   #     dims=('time', 'lon', 'lat'),
   #     coords={
-  #         'time': NameOnlyCoordinate("time"),
-  #         'lon': Axis(LonLatGrid(...), axis=0),
-  #         'lat': Axis(LonLatGrid(...), axis=1),
+  #         'time': NamedAxis("time"),
+  #         'lon': SelectedAxis(LonLatGrid(...), axis=0),
+  #         'lat': SelectedAxis(LonLatGrid(...), axis=1),
   #     }
   # )
 

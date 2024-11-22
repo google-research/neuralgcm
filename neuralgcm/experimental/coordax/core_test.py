@@ -1,5 +1,16 @@
-"""Tests core methods in the coordax API."""
-
+# Copyright 2024 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 import functools
 import operator
 from typing import Any, Callable
@@ -9,6 +20,7 @@ from absl.testing import parameterized
 import chex
 import jax
 import jax.numpy as jnp
+from neuralgcm.experimental import coordax
 from neuralgcm.experimental.coordax import core
 from neuralgcm.experimental.coordax import testing
 import numpy as np
@@ -31,7 +43,7 @@ class CoreTest(parameterized.TestCase):
       dict(
           testcase_name='view_with_name_and_coord',
           array=np.arange(5 * 3).reshape((5, 3, 1)),
-          tags=('i', 'j', core.NamedCoordinate('k', np.arange(1))),
+          tags=('i', 'j', coordax.LabeledAxis('k', np.arange(1))),
           untags=('j',),
           expected_dims=('i', 0, 'k'),
           expected_named_shape={'i': 5, 'k': 1},
@@ -41,7 +53,7 @@ class CoreTest(parameterized.TestCase):
       dict(
           testcase_name='tag_prefix',
           array=np.arange(5 * 3).reshape((5, 3, 1)),
-          tags=(core.NamedCoordinate('k', np.arange(5)), 'j'),
+          tags=(coordax.LabeledAxis('k', np.arange(5)), 'j'),
           untags=(),  # untag can only be used on fully labeled fields.
           expected_dims=('k', 'j', 0),
           expected_named_shape={'k': 5, 'j': 3},
@@ -52,15 +64,15 @@ class CoreTest(parameterized.TestCase):
   def test_field_properties(
       self,
       array: np.ndarray,
-      tags: tuple[str | core.Coordinate, ...],
-      untags: tuple[str | core.Coordinate, ...],
+      tags: tuple[str | coordax.Coordinate, ...],
+      untags: tuple[str | coordax.Coordinate, ...],
       expected_dims: tuple[str | int, ...],
       expected_named_shape: dict[str, int],
       expected_positional_shape: tuple[int, ...],
       expected_coord_field_keys: set[str],
   ):
     """Tests that field properties are correctly set."""
-    field = core.wrap(array)
+    field = coordax.wrap(array)
     if len(tags) == array.ndim:
       field = field.tag(*tags)
     else:
@@ -89,36 +101,42 @@ class CoreTest(parameterized.TestCase):
   @parameterized.named_parameters(
       dict(
           testcase_name='sum_simple',
-          field_a=core.wrap(np.arange(2 * 3 * 4).reshape((2, 4, 3))),
-          field_b=core.wrap(np.arange(2 * 3 * 4).reshape((2, 4, 3))),
+          field_a=coordax.wrap(np.arange(2 * 3 * 4).reshape((2, 4, 3))),
+          field_b=coordax.wrap(np.arange(2 * 3 * 4).reshape((2, 4, 3))),
           op=operator.add,
-          expected_result=core.wrap(
+          expected_result=coordax.wrap(
               np.arange(2 * 3 * 4).reshape((2, 4, 3)) * 2
           ),
       ),
       dict(
           testcase_name='sum_aligned',
-          field_a=core.wrap(np.arange(2 * 3).reshape((2, 3)), 'x', 'y'),
-          field_b=core.wrap(np.arange(2 * 3)[::-1].reshape((3, 2)), 'y', 'x'),
+          field_a=coordax.wrap(np.arange(2 * 3).reshape((2, 3)), 'x', 'y'),
+          field_b=coordax.wrap(
+              np.arange(2 * 3)[::-1].reshape((3, 2)), 'y', 'x'
+          ),
           op=operator.add,
-          expected_result=core.wrap(np.array([[5, 4, 3], [7, 6, 5]]), 'x', 'y'),
+          expected_result=coordax.wrap(
+              np.array([[5, 4, 3], [7, 6, 5]]), 'x', 'y'
+          ),
       ),
       dict(
           testcase_name='product_aligned',
-          field_a=core.wrap(np.arange(2 * 3).reshape((2, 3))).tag_prefix('x'),
-          field_b=core.wrap(np.arange(2), 'x'),
+          field_a=coordax.wrap(np.arange(2 * 3).reshape((2, 3))).tag_prefix(
+              'x'
+          ),
+          field_b=coordax.wrap(np.arange(2), 'x'),
           op=operator.mul,
-          expected_result=core.wrap(
+          expected_result=coordax.wrap(
               np.arange(2 * 3).reshape((2, 3)) * np.array([[0], [1]])
           ).tag_prefix('x'),
       ),
   )
   def test_field_binary_ops(
       self,
-      field_a: core.Field,
-      field_b: core.Field,
-      op: Callable[[core.Field, core.Field], core.Field],
-      expected_result: core.Field,
+      field_a: coordax.Field,
+      field_b: coordax.Field,
+      op: Callable[[coordax.Field, coordax.Field], coordax.Field],
+      expected_result: coordax.Field,
   ):
     """Tests that field binary ops work as expected."""
     actual = op(field_a, field_b)
@@ -134,14 +152,14 @@ class CoreTest(parameterized.TestCase):
       dict(
           testcase_name='coord_&_name',
           array=np.arange(4),
-          tags=(core.NameOnlyCoordinate('idx', 4),),
+          tags=(coordax.NamedAxis('idx', 4),),
           untags=('idx',),
       ),
       dict(
           testcase_name='coord_&_coord',
           array=np.arange(4),
-          tags=(core.NameOnlyCoordinate('idx', 4),),
-          untags=(core.NameOnlyCoordinate('idx', 4),),
+          tags=(coordax.NamedAxis('idx', 4),),
+          untags=(coordax.NamedAxis('idx', 4),),
       ),
       dict(
           testcase_name='names_&_partial_name',
@@ -154,7 +172,7 @@ class CoreTest(parameterized.TestCase):
           testcase_name='names_&_partial_coord',
           array=np.arange(2 * 3).reshape((2, 3)),
           tags=('x', 'y'),
-          untags=(core.NameOnlyCoordinate('y', 3),),
+          untags=(coordax.NamedAxis('y', 3),),
           full_unwrap=False,
       ),
       dict(
@@ -162,8 +180,8 @@ class CoreTest(parameterized.TestCase):
           array=np.arange(2 * 3).reshape((2, 3)),
           tags=('x', 'y'),
           untags=(
-              core.NameOnlyCoordinate('x', 2),
-              core.NameOnlyCoordinate('y', 3),
+              coordax.NamedAxis('x', 2),
+              coordax.NamedAxis('y', 3),
           ),
           full_unwrap=True,
       ),
@@ -172,9 +190,9 @@ class CoreTest(parameterized.TestCase):
           array=np.arange(2 * 3).reshape((2, 3)),
           tags=('x', 'y'),
           untags=(
-              core.compose_coordinates(
-                  core.NameOnlyCoordinate('x', 2),
-                  core.NameOnlyCoordinate('y', 3),
+              coordax.compose_coordinates(
+                  coordax.NamedAxis('x', 2),
+                  coordax.NamedAxis('y', 3),
               ),
           ),
           full_unwrap=True,
@@ -183,15 +201,15 @@ class CoreTest(parameterized.TestCase):
           testcase_name='product_coord_&_product_coord',
           array=np.arange(2 * 3).reshape((2, 3)),
           tags=(
-              core.compose_coordinates(
-                  core.NameOnlyCoordinate('x', 2),
-                  core.NameOnlyCoordinate('y', 3),
+              coordax.compose_coordinates(
+                  coordax.NamedAxis('x', 2),
+                  coordax.NamedAxis('y', 3),
               ),
           ),
           untags=(
-              core.compose_coordinates(
-                  core.NameOnlyCoordinate('x', 2),
-                  core.NameOnlyCoordinate('y', 3),
+              coordax.compose_coordinates(
+                  coordax.NamedAxis('x', 2),
+                  coordax.NamedAxis('y', 3),
               ),
           ),
           full_unwrap=True,
@@ -199,14 +217,14 @@ class CoreTest(parameterized.TestCase):
       dict(
           testcase_name='mixed_&_names',
           array=np.arange(2 * 3 * 4).reshape((2, 4, 3)),
-          tags=('x', core.NameOnlyCoordinate('y', 4), 'z'),
+          tags=('x', coordax.NamedAxis('y', 4), 'z'),
           untags=('y', 'z'),
           full_unwrap=False,
       ),
       dict(
           testcase_name='mixed_&_wrong_names',
           array=np.arange(2 * 3 * 4).reshape((2, 4, 3)),
-          tags=('x', core.NameOnlyCoordinate('y_prime', 4), 'z'),
+          tags=('x', coordax.NamedAxis('y_prime', 4), 'z'),
           untags=('y', 'z'),
           full_unwrap=False,
           should_raise_on_untag=True,
@@ -215,12 +233,12 @@ class CoreTest(parameterized.TestCase):
           testcase_name='coord_&_wrong_coord_value',
           array=np.arange(9),
           tags=(
-              core.NamedCoordinate(
+              coordax.LabeledAxis(
                   'z',
                   np.arange(9),
               ),
           ),
-          untags=(core.NamedCoordinate('z', np.arange(9) + 1),),
+          untags=(coordax.LabeledAxis('z', np.arange(9) + 1),),
           full_unwrap=False,
           should_raise_on_untag=True,
       ),
@@ -228,17 +246,17 @@ class CoreTest(parameterized.TestCase):
   def test_tag_then_untag_by(
       self,
       array: np.ndarray,
-      tags: tuple[str | core.Coordinate, ...],
-      untags: tuple[str | core.Coordinate, ...],
+      tags: tuple[str | coordax.Coordinate, ...],
+      untags: tuple[str | coordax.Coordinate, ...],
       should_raise_on_untag: bool = False,
       full_unwrap: bool = True,
   ):
     """Tests that tag and untag on Field work as expected."""
     with self.subTest('tag'):
-      field = core.wrap(array, *tags)
+      field = coordax.wrap(array, *tags)
       expected_dims = sum(
           [
-              tag.dims if isinstance(tag, core.Coordinate) else (tag,)
+              tag.dims if isinstance(tag, coordax.Coordinate) else (tag,)
               for tag in tags
           ],
           start=tuple(),
@@ -258,32 +276,32 @@ class CoreTest(parameterized.TestCase):
   @parameterized.named_parameters(
       dict(
           testcase_name='full_by_names',
-          f=core.wrap(np.arange(2 * 3 * 4).reshape((2, 4, 3))),
+          f=coordax.wrap(np.arange(2 * 3 * 4).reshape((2, 4, 3))),
           tags=('x', 'y', 'z'),
           expected_dims=('x', 'y', 'z'),
           expected_coord_field_keys=set(),
       ),
       dict(
           testcase_name='partial_by_names',
-          f=core.wrap(np.arange(2 * 3 * 4).reshape((2, 4, 3))),
+          f=coordax.wrap(np.arange(2 * 3 * 4).reshape((2, 4, 3))),
           tags=('x', 'y'),
           expected_dims=('x', 'y', 0),
           expected_coord_field_keys=set(),
       ),
       dict(
           testcase_name='partial_by_name&coord',
-          f=core.wrap(np.arange(2 * 3 * 4).reshape((2, 4, 3))),
-          tags=('x', core.NamedCoordinate('y', np.arange(4))),
+          f=coordax.wrap(np.arange(2 * 3 * 4).reshape((2, 4, 3))),
+          tags=('x', coordax.LabeledAxis('y', np.arange(4))),
           expected_dims=('x', 'y', 0),
           expected_coord_field_keys=set(['y']),
       ),
       dict(
           testcase_name='partial_by_product_coord',
-          f=core.wrap(np.arange(2 * 3 * 4).reshape((2, 4, 3))),
+          f=coordax.wrap(np.arange(2 * 3 * 4).reshape((2, 4, 3))),
           tags=(
-              core.compose_coordinates(
-                  core.NamedCoordinate('x', np.arange(2)),
-                  core.NamedCoordinate('z', np.linspace(0, 1, 4)),
+              coordax.compose_coordinates(
+                  coordax.LabeledAxis('x', np.arange(2)),
+                  coordax.LabeledAxis('z', np.linspace(0, 1, 4)),
               ),
           ),
           expected_dims=('x', 'z', 0),
@@ -292,8 +310,8 @@ class CoreTest(parameterized.TestCase):
   )
   def test_tag_prefix(
       self,
-      f: core.Field,
-      tags: tuple[str | tuple[str, ...] | core.Coordinate, ...],
+      f: coordax.Field,
+      tags: tuple[str | tuple[str, ...] | coordax.Coordinate, ...],
       expected_dims: tuple[str | int, ...],
       expected_coord_field_keys: set[str],
   ):
@@ -308,7 +326,7 @@ class CoreTest(parameterized.TestCase):
   @parameterized.named_parameters(
       dict(
           testcase_name='cos(x)',
-          inputs=core.wrap(np.arange(2 * 3 * 4).reshape((2, 4, 3))),
+          inputs=coordax.wrap(np.arange(2 * 3 * 4).reshape((2, 4, 3))),
           tags=('x', 'y', 'z'),
           untags=('x',),
           fn=jnp.cos,
@@ -318,8 +336,8 @@ class CoreTest(parameterized.TestCase):
       ),
       dict(
           testcase_name='norm(x, z)',
-          inputs=core.wrap(np.arange(2 * 3 * 5).reshape((2, 3, 5))),
-          tags=('x', core.NamedCoordinate('y', np.arange(3)), 'z'),
+          inputs=coordax.wrap(np.arange(2 * 3 * 5).reshape((2, 3, 5))),
+          tags=('x', coordax.LabeledAxis('y', np.arange(3)), 'z'),
           fn=jnp.linalg.norm,
           untags=('x', 'z'),
           expected_dims=('y',),
@@ -329,9 +347,9 @@ class CoreTest(parameterized.TestCase):
   )
   def test_cmap(
       self,
-      inputs: core.Field,
-      tags: tuple[str | core.Coordinate, ...],
-      untags: tuple[str | core.Coordinate, ...],
+      inputs: coordax.Field,
+      tags: tuple[str | coordax.Coordinate, ...],
+      untags: tuple[str | coordax.Coordinate, ...],
       fn: Callable[..., Any],
       expected_dims: tuple[str | int, ...],
       expected_coord_field_keys: set[str],
@@ -339,7 +357,7 @@ class CoreTest(parameterized.TestCase):
   ):
     """Tests that cmap works as expected."""
     input_f = inputs.tag_prefix(*tags).untag(*untags)
-    actual = core.cmap(fn)(input_f)
+    actual = coordax.cmap(fn)(input_f)
     expected_values = result_fn(inputs.data)
     testing.assert_field_properties(
         actual=actual,
@@ -351,13 +369,13 @@ class CoreTest(parameterized.TestCase):
 
   def test_jax_transforms(self):
     """Tests that vmap/scan work with Field with leading positional axes."""
-    coords = core.NamedCoordinate('x', np.array([2, 3, 7]))
+    coords = coordax.LabeledAxis('x', np.array([2, 3, 7]))
     batch, length = 4, 10
-    vmap_axis = core.NameOnlyCoordinate('i', batch)
-    scan_axis = core.NamedCoordinate('timedelta', np.arange(length))
+    vmap_axis = coordax.NamedAxis('i', batch)
+    scan_axis = coordax.LabeledAxis('timedelta', np.arange(length))
 
     def initialize(data):
-      return core.wrap(data, coords)
+      return coordax.wrap(data, coords)
 
     def body_fn(c, _):
       return (c + 1, c)
