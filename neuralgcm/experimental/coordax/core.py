@@ -128,60 +128,43 @@ class SelectedAxis(Coordinate, struct.Struct):
     return f'coordax.SelectedAxis({self.coordinate!r}, axis={self.axis})'
 
 
-def combine_slices(*coordinates: Coordinate) -> tuple[Coordinate, ...]:
-  """Combines complete slices of a coordinate into a single unsliced object."""
-  # TODO(dkochkov): Simplify this implementation.
-  if len(coordinates) < 2:
-    return coordinates
-  current_slice = None
-  current_combined = None
-  current_slice_idx = 0
-  combined_coordinates = []
+def consolidate_coordinates(*coordinates: Coordinate) -> tuple[Coordinate, ...]:
+  """Consolidates coordinates without SelectedAxis objects, if possible."""
+  axes = []
+  result = []
+
+  def reset_axes():
+    result.extend(axes)
+    axes[:] = []
+
+  def append_axis(c):
+    axes.append(c)
+    if len(axes) == c.coordinate.ndim:
+      # sucessful consolidation
+      result.append(c.coordinate)
+      axes[:] = []
+
   for c in coordinates:
-    if not isinstance(c, SelectedAxis):
-      if current_slice is not None:  # if we're building a slice - add it.
-        combined_coordinates.append(current_slice)
-      combined_coordinates.append(c)  # add and reset.
-      current_slice = None
-      current_combined = None
-      current_slice_idx = 0
-      continue
-    elif c.coordinate != current_combined:
-      if current_slice is not None:  # if we're building a slice - add it.
-        combined_coordinates.append(current_slice)
-      if c.axis == 0:  # if first slice - start building a new one.
-        current_slice = c
-        current_combined = c.coordinate
-        current_slice_idx = 1
-      else:  # reset as we cannot start building from non-0 index.
-        combined_coordinates.append(c)
-        current_slice = None
-        current_combined = None
-        current_slice_idx = 0
-    elif c.axis == current_slice_idx:
-      if c.coordinate.ndim == (current_slice_idx + 1):
-        # built a full coordinate out of slices -> add it and reset.
-        combined_coordinates.append(current_combined)
-        current_slice = None
-        current_combined = None
-        current_slice_idx = 0
-      else:
-        current_slice_idx += 1  # increment building index.
-    else:  # have the right coordinate, but not the needed slice.
-      assert isinstance(current_slice, SelectedAxis)  # make pytype happy.
-      combined_coordinates.append(current_slice)
-      if c.axis == 0:  # if first slice - start building a new one.
-        current_slice = c
-        current_combined = c.coordinate
-        current_slice_idx = 1
-      else:  # reset as we cannot start building from non-0 index.
-        combined_coordinates.append(c)
-        current_slice = None
-        current_combined = None
-        current_slice_idx = 0
-  if current_slice is not None:
-    combined_coordinates.append(current_slice)
-  return tuple(combined_coordinates)
+    if isinstance(c, SelectedAxis) and c.axis == 0:
+      # new SelectedAxis to consider consolidating
+      reset_axes()
+      append_axis(c)
+    elif (
+        isinstance(c, SelectedAxis)
+        and axes
+        and c.axis == len(axes)
+        and c.coordinate == axes[-1].coordinate
+    ):
+      # continued SelectedAxis to consolidate
+      append_axis(c)
+    else:
+      # coordinate cannot be consolidated
+      reset_axes()
+      result.append(c)
+
+  reset_axes()
+
+  return tuple(result)
 
 
 @struct.pytree_dataclass
@@ -203,7 +186,7 @@ class CartesianProduct(Coordinate, struct.Struct):
           new_coordinates.append(SelectedAxis(c, i))
       else:
         new_coordinates.append(c)
-    combined_coordinates = combine_slices(*new_coordinates)
+    combined_coordinates = consolidate_coordinates(*new_coordinates)
     if len(combined_coordinates) <= 1:
       raise ValueError('CartesianProduct must contain more than 1 component')
     existing_dims = collections.Counter()
@@ -312,10 +295,7 @@ class LabeledAxis(Coordinate):  # pytype: disable=final-error
     return hash(self._components())
 
   def __repr__(self):
-    return (
-        f'coordax.LabeledAxis({self.name!r},'
-        f' ticks={self.ticks!r})'
-    )
+    return f'coordax.LabeledAxis({self.name!r}, ticks={self.ticks!r})'
 
 
 def compose_coordinates(*coordinates: Coordinate) -> Coordinate:
@@ -764,7 +744,7 @@ class Field(struct.Struct):
   def __repr__(self):
     indent = '    '
     data_repr = textwrap.indent(repr(self.data), prefix=indent)
-    coordinates = combine_slices(*self.coords.values())
+    coordinates = consolidate_coordinates(*self.coords.values())
     coords_repr = indent + f',\n{indent}'.join(
         repr(c).removeprefix('coordax.') for c in coordinates
     )
