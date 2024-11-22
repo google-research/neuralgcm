@@ -148,7 +148,7 @@ class CoreTest(parameterized.TestCase):
             array([[1, 2, 3],
                    [4, 5, 6]]),
             NamedAxis('x', size=2),
-            LabeledAxis('y', tick_values=array([7, 8, 9])),
+            LabeledAxis('y', ticks=array([7, 8, 9])),
         )""")
     actual = coordax.wrap(
         np.array([[1, 2, 3], [4, 5, 6]]),

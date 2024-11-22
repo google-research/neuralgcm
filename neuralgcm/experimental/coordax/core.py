@@ -243,12 +243,12 @@ class CartesianProduct(Coordinate, struct.Struct):
 class NamedAxis(Coordinate, struct.Struct):
   """One dimensional coordinate that only dimension size."""
 
-  axis_name: str = dataclasses.field(metadata={'pytree_node': False})
+  name: str = dataclasses.field(metadata={'pytree_node': False})
   size: int = dataclasses.field(metadata={'pytree_node': False})
 
   @property
   def dims(self) -> tuple[AxisName, ...]:
-    return (self.axis_name,)
+    return (self.name,)
 
   @property
   def shape(self) -> tuple[int, ...]:
@@ -259,7 +259,7 @@ class NamedAxis(Coordinate, struct.Struct):
     return {}
 
   def __repr__(self):
-    return f'coordax.NamedAxis({self.axis_name!r}, size={self.size})'
+    return f'coordax.NamedAxis({self.name!r}, size={self.size})'
 
 
 # TODO(dkochkov): consider using @struct.pytree_dataclass here and storing
@@ -269,23 +269,23 @@ class NamedAxis(Coordinate, struct.Struct):
 class LabeledAxis(Coordinate):  # pytype: disable=final-error
   """One dimensional coordinate with custom coordinate values."""
 
-  axis_name: str = dataclasses.field(metadata={'pytree_node': False})
-  tick_values: np.ndarray = dataclasses.field(metadata={'pytree_node': False})
+  name: str = dataclasses.field(metadata={'pytree_node': False})
+  ticks: np.ndarray = dataclasses.field(metadata={'pytree_node': False})
 
   @property
   def dims(self) -> tuple[AxisName, ...]:
-    return (self.axis_name,)
+    return (self.name,)
 
   @property
   def shape(self) -> tuple[int, ...]:
-    return self.tick_values.shape
+    return self.ticks.shape
 
   @property
   def fields(self) -> dict[str, Field]:
-    return {self.axis_name: wrap(self.tick_values, self)}
+    return {self.name: wrap(self.ticks, self)}
 
   def _components(self):
-    return (self.axis_name, ArrayKey(self.tick_values))
+    return (self.name, ArrayKey(self.ticks))
 
   def tree_flatten(self):
     """Flattens LabeledAxis."""
@@ -296,8 +296,8 @@ class LabeledAxis(Coordinate):  # pytype: disable=final-error
   def tree_unflatten(cls, aux_data, leaves):
     """Unflattens LabeledAxis."""
     del leaves  # unused
-    axis_name, array_key = aux_data
-    return cls(axis_name=axis_name, tick_values=array_key.value)
+    name, array_key = aux_data
+    return cls(name=name, ticks=array_key.value)
 
   def __eq__(self, other):
     return (
@@ -313,8 +313,8 @@ class LabeledAxis(Coordinate):  # pytype: disable=final-error
 
   def __repr__(self):
     return (
-        f'coordax.LabeledAxis({self.axis_name!r},'
-        f' tick_values={self.tick_values!r})'
+        f'coordax.LabeledAxis({self.name!r},'
+        f' ticks={self.ticks!r})'
     )
 
 
