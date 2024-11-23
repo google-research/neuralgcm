@@ -130,15 +130,12 @@ class InverseShiftAndNormalize(hk.Module):
     # an error, as expected. This works because tree_map skips `None` values in
     # the first argument, as long as all dictionary keys match.
     result = jax.tree_util.tree_map(
-      lambda x, y, z: None if x is None else (x * z + y),
-      inputs, 
-      shifts, 
+      lambda x, y, z: None if x is None else x * z + y,
+      inputs,
+      shifts,
       scales,
       is_leaf=lambda x: x is None
     )
-
-    # result = jax.tree_util.tree_map(
-    #     lambda x, y, z: x * z + y, inputs, shifts, scales)
     return from_dict_fn(result)
 
 
