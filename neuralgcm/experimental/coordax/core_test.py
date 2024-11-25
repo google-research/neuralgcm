@@ -265,6 +265,7 @@ class CoreTest(parameterized.TestCase):
   ):
     """Tests that field binary ops work as expected."""
     actual = op(field_a, field_b)
+    actual.check_valid()
     testing.assert_fields_allclose(actual=actual, desired=expected_result)
 
   def test_field_repr(self):
@@ -462,6 +463,78 @@ class CoreTest(parameterized.TestCase):
         dims=expected_dims,
         coord_field_keys=expected_coord_field_keys,
     )
+
+  @parameterized.named_parameters(
+      dict(
+          testcase_name='partial_by_name_tail',
+          f=coordax.wrap(np.arange(2 * 3).reshape((2, 3)), 'x', 'y'),
+          untags=('y',),
+          prefix_expected_dims=('x', 0),
+          suffix_expected_dims=('x', 0),
+          expected_coord_field_keys=set(),
+      ),
+      dict(
+          testcase_name='partial_by_name_head',
+          f=coordax.wrap(np.arange(2 * 3).reshape((2, 3)), 'x', 'y'),
+          untags=('x',),
+          prefix_expected_dims=(0, 'y'),
+          suffix_expected_dims=(0, 'y'),
+          expected_coord_field_keys=set(),
+      ),
+      dict(
+          testcase_name='partial_by_coord',
+          f=coordax.wrap(
+              np.arange(2 * 3 * 5).reshape((2, 3, 5)),
+              'x', coordax.LabeledAxis('y', np.arange(3)), 'z'),
+          untags=('x', 'z'),
+          prefix_expected_dims=(0, 'y', 1),
+          suffix_expected_dims=(0, 'y', 1),
+          expected_coord_field_keys=set(['y']),
+      ),
+      dict(
+          testcase_name='with_positional_prefix_partial_by_name',
+          f=coordax.wrap(
+              np.arange(2 * 3 * 5).reshape((2, 3, 5)),
+              'x', coordax.LabeledAxis('y', np.arange(3)), 'z').untag('x'),
+          untags=('z',),
+          prefix_expected_dims=(1, 'y', 0),
+          suffix_expected_dims=(0, 'y', 1),
+          expected_coord_field_keys=set(['y']),
+      ),
+      dict(
+          testcase_name='mixed_partial_by_name',
+          f=coordax.wrap(
+              np.ones((1, 1, 1, 1)),
+              'x', 'y', 'z', 'w').untag('y', 'w'),
+          untags=('z',),
+          prefix_expected_dims=('x', 1, 0, 2),
+          suffix_expected_dims=('x', 0, 2, 1),
+          expected_coord_field_keys=set(),
+      ),
+  )
+  def test_untag(
+      self,
+      f: coordax.Field,
+      untags: tuple[str | tuple[str, ...] | coordax.Coordinate, ...],
+      prefix_expected_dims: tuple[str | int, ...],
+      suffix_expected_dims: tuple[str | int, ...],
+      expected_coord_field_keys: set[str],
+  ):
+    """Tests that untag_prefix works as expected."""
+    with self.subTest('prefix'):
+      untagged_f = f.untag_prefix(*untags)
+      testing.assert_field_properties(
+          actual=untagged_f,
+          dims=prefix_expected_dims,
+          coord_field_keys=expected_coord_field_keys,
+      )
+    with self.subTest('suffix'):
+      untagged_f = f.untag_suffix(*untags)
+      testing.assert_field_properties(
+          actual=untagged_f,
+          dims=suffix_expected_dims,
+          coord_field_keys=expected_coord_field_keys,
+      )
 
   @parameterized.named_parameters(
       dict(

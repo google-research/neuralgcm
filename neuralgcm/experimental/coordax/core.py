@@ -61,7 +61,7 @@ class Coordinate(abc.ABC):
 
   @property
   @abc.abstractmethod
-  def fields(self) -> dict[str, Field]:
+  def fields(self) -> dict[AxisName, Field]:
     """A maps from field names to their values."""
 
   @property
@@ -115,7 +115,7 @@ class SelectedAxis(Coordinate, struct.Struct):
     return (self.coordinate.shape[self.axis],)
 
   @property
-  def fields(self) -> dict[str, Field]:
+  def fields(self) -> dict[AxisName, Field]:
     """A maps from field names to their values."""
     return self.coordinate.fields
 
@@ -215,7 +215,7 @@ class CartesianProduct(Coordinate, struct.Struct):
     return sum([c.shape for c in self.coordinates], start=tuple())
 
   @property
-  def fields(self) -> dict[str, Field]:
+  def fields(self) -> dict[AxisName, Field]:
     """Returns a mapping from field names to their values."""
     return functools.reduce(
         operator.or_, [c.fields for c in self.coordinates], {}
@@ -226,7 +226,7 @@ class CartesianProduct(Coordinate, struct.Struct):
 class NamedAxis(Coordinate, struct.Struct):
   """One dimensional coordinate that only dimension size."""
 
-  name: str = dataclasses.field(metadata={'pytree_node': False})
+  name: AxisName = dataclasses.field(metadata={'pytree_node': False})
   size: int = dataclasses.field(metadata={'pytree_node': False})
 
   @property
@@ -238,7 +238,7 @@ class NamedAxis(Coordinate, struct.Struct):
     return (self.size,)
 
   @property
-  def fields(self) -> dict[str, Field]:
+  def fields(self) -> dict[AxisName, Field]:
     return {}
 
   def __repr__(self):
@@ -252,7 +252,7 @@ class NamedAxis(Coordinate, struct.Struct):
 class LabeledAxis(Coordinate):  # pytype: disable=final-error
   """One dimensional coordinate with custom coordinate values."""
 
-  name: str = dataclasses.field(metadata={'pytree_node': False})
+  name: AxisName = dataclasses.field(metadata={'pytree_node': False})
   ticks: np.ndarray = dataclasses.field(metadata={'pytree_node': False})
 
   @property
@@ -264,7 +264,7 @@ class LabeledAxis(Coordinate):  # pytype: disable=final-error
     return self.ticks.shape
 
   @property
-  def fields(self) -> dict[str, Field]:
+  def fields(self) -> dict[AxisName, Field]:
     return {self.name: wrap(self.ticks, self)}
 
   def _components(self):
@@ -458,6 +458,24 @@ def _wrap_array_method(name):
   return wrapped_func
 
 
+def _wrap_array_or_scalar(inputs: float | np.ndarray | jax.Array) -> Field:
+  """Helper function that wraps inputs in a fully positional Field."""
+  if isinstance(inputs, float):
+    data_array = jnp.array(inputs)
+  elif isinstance(inputs, np.ndarray):
+    data_array = inputs
+  else:
+    data_array = jnp.asarray(inputs)
+  named_array = named_axes.NamedArray(
+      named_axes=collections.OrderedDict(), data_array=data_array
+  )
+  wrapped = Field(
+      named_array=named_array,
+      coords={},
+  )
+  return wrapped
+
+
 @struct.pytree_dataclass
 class Field(struct.Struct):
   """An array with a combination of positional and named dimensions.
@@ -591,7 +609,7 @@ class Field(struct.Struct):
           for i, dim in enumerate(c.dims):
             coords[dim] = c if c.ndim == 1 else SelectedAxis(c, i)
       else:
-        coords[c] = NamedAxis(str(c), size=tagged_array.named_shape[c])
+        coords[c] = NamedAxis(c, size=tagged_array.named_shape[c])
     result = Field(named_array=tagged_array, coords=coords)
     result.check_valid()
     return result
@@ -622,10 +640,28 @@ class Field(struct.Struct):
         for dim in c.dims:
           coords[dim] = c
       else:
-        coords[c] = NamedAxis(str(c), size=tagged_array.named_shape[c])
+        coords[c] = NamedAxis(c, size=tagged_array.named_shape[c])
     result = Field(named_array=tagged_array, coords=coords)
     result.check_valid()
     return result
+
+  def tag_suffix(self, *axis_order: AxisName | Coordinate) -> Field:
+    """Returns a field with coords attached to the last positional axes."""
+    n_tmp = len(self.positional_shape) - len(_dimension_names(*axis_order))
+    tmp_dims = [named_axes.TmpPosAxisMarker() for _ in range(n_tmp)]
+    return (
+        self.tag(*tmp_dims, *axis_order)
+        .untag_prefix(*tmp_dims)
+    )
+
+  def untag_suffix(self, *axis_order: AxisName | Coordinate) -> Field:
+    """Returns a field with requested axes made last positional axes."""
+    n_tmp = len(self.positional_shape)
+    tmp_dims = [named_axes.TmpPosAxisMarker() for _ in range(n_tmp)]
+    return (
+        self.tag(*tmp_dims)
+        .untag(*tmp_dims, *axis_order)
+    )
 
   # Note: Can't call this "transpose" like Xarray, to avoid conflicting with the
   # positional only ndarray method.
@@ -700,19 +736,7 @@ class Field(struct.Struct):
       cls, array: jax.typing.ArrayLike | float, *names: AxisName | Coordinate
   ) -> Field:
     """Wraps a positional array as a ``Field``."""
-    if isinstance(array, float):
-      data_array = jnp.array(array)
-    elif isinstance(array, np.ndarray):
-      data_array = array
-    else:
-      data_array = jnp.asarray(array)
-    named_array = named_axes.NamedArray(
-        named_axes=collections.OrderedDict(), data_array=data_array
-    )
-    wrapped = Field(
-        named_array=named_array,
-        coords={},
-    )
+    wrapped = _wrap_array_or_scalar(array)
     if names:
       return wrapped.tag(*names)
     else:
