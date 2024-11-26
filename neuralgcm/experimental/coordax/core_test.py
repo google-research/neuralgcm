@@ -83,12 +83,8 @@ class CoreTest(parameterized.TestCase):
       ),
       dict(
           testcase_name='selection_incomplete',
-          coordinates=(
-              coordax.SelectedAxis(PRODUCT_XY, axis=0),
-          ),
-          expected=(
-              coordax.SelectedAxis(PRODUCT_XY, axis=0),
-          ),
+          coordinates=(coordax.SelectedAxis(PRODUCT_XY, axis=0),),
+          expected=(coordax.SelectedAxis(PRODUCT_XY, axis=0),),
       ),
       dict(
           testcase_name='selections_with_following',
@@ -152,6 +148,59 @@ class CoreTest(parameterized.TestCase):
   )
   def test_consolidate_coordinates(self, coordinates, expected):
     actual = core.consolidate_coordinates(*coordinates)
+    self.assertEqual(actual, expected)
+
+  @parameterized.named_parameters(
+      dict(
+          testcase_name='selected_axes_compoents_merge',
+          coordinates=(
+              coordax.SelectedAxis(PRODUCT_XY, axis=0),
+              coordax.SelectedAxis(PRODUCT_XY, axis=1),
+          ),
+          expected=PRODUCT_XY,
+      ),
+      dict(
+          testcase_name='selected_axis_simplified',
+          coordinates=(
+              coordax.SelectedAxis(coordax.NamedAxis('x', 4), axis=0),
+              coordax.NamedAxis('z', 7),
+          ),
+          expected=coordax.CartesianProduct(
+              (coordax.NamedAxis('x', 4), coordax.NamedAxis('z', 7))
+          ),
+      ),
+      dict(
+          testcase_name='cartesian_product_unraveled',
+          coordinates=(
+              coordax.NamedAxis('x', 7),
+              coordax.CartesianProduct(
+                  (coordax.NamedAxis('y', 7), coordax.NamedAxis('z', 4))
+              ),
+          ),
+          expected=coordax.CartesianProduct((
+              coordax.NamedAxis('x', 7),
+              coordax.NamedAxis('y', 7),
+              coordax.NamedAxis('z', 4),
+          )),
+      ),
+      dict(
+          testcase_name='consolidate_over_parts',
+          coordinates=(
+              coordax.SelectedAxis(PRODUCT_XY, axis=0),
+              coordax.CartesianProduct((
+                  coordax.SelectedAxis(PRODUCT_XY, axis=1),
+                  coordax.NamedAxis('z', 4)
+              )),
+          ),
+          expected=coordax.CartesianProduct((
+              coordax.NamedAxis('x', 2),
+              coordax.NamedAxis('y', 3),
+              coordax.NamedAxis('z', 4),
+          )),
+      ),
+  )
+  def test_compose_coordinates(self, coordinates, expected):
+    actual = core.compose_coordinates(*coordinates)
     self.assertEqual(actual, expected)
 
   @parameterized.named_parameters(
@@ -485,7 +534,10 @@ class CoreTest(parameterized.TestCase):
           testcase_name='partial_by_coord',
           f=coordax.wrap(
               np.arange(2 * 3 * 5).reshape((2, 3, 5)),
-              'x', coordax.LabeledAxis('y', np.arange(3)), 'z'),
+              'x',
+              coordax.LabeledAxis('y', np.arange(3)),
+              'z',
+          ),
           untags=('x', 'z'),
           prefix_expected_dims=(0, 'y', 1),
           suffix_expected_dims=(0, 'y', 1),
@@ -495,7 +547,10 @@ class CoreTest(parameterized.TestCase):
           testcase_name='with_positional_prefix_partial_by_name',
           f=coordax.wrap(
               np.arange(2 * 3 * 5).reshape((2, 3, 5)),
-              'x', coordax.LabeledAxis('y', np.arange(3)), 'z').untag('x'),
+              'x',
+              coordax.LabeledAxis('y', np.arange(3)),
+              'z',
+          ).untag('x'),
           untags=('z',),
           prefix_expected_dims=(1, 'y', 0),
           suffix_expected_dims=(0, 'y', 1),
@@ -503,9 +558,9 @@ class CoreTest(parameterized.TestCase):
       ),
       dict(
           testcase_name='mixed_partial_by_name',
-          f=coordax.wrap(
-              np.ones((1, 1, 1, 1)),
-              'x', 'y', 'z', 'w').untag('y', 'w'),
+          f=coordax.wrap(np.ones((1, 1, 1, 1)), 'x', 'y', 'z', 'w').untag(
+              'y', 'w'
+          ),
           untags=('z',),
           prefix_expected_dims=('x', 1, 0, 2),
           suffix_expected_dims=('x', 0, 2, 1),

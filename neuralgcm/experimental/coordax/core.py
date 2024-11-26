@@ -302,6 +302,13 @@ def compose_coordinates(*coordinates: Coordinate) -> Coordinate:
   """Composes `coords` into a single coordinate system by cartesian product."""
   if not coordinates:
     raise ValueError('No coordinates provided.')
+  coordinate_axes = []
+  for c in coordinates:
+    if isinstance(c, CartesianProduct):
+      coordinate_axes.extend(c.coordinates)
+    else:
+      coordinate_axes.append(c)
+  coordinates = consolidate_coordinates(*coordinate_axes)
   if len(coordinates) == 1:
     return coordinates[0]
   return CartesianProduct(coordinates)
