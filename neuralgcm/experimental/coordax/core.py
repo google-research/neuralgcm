@@ -772,14 +772,16 @@ class Field(struct.Struct):
   #     }
   # )
 
-  def __repr__(self):
-    indent = '    '
-    data_repr = textwrap.indent(repr(self.data), prefix=indent)
-    coordinates = consolidate_coordinates(*self.coords.values())
-    coords_repr = indent + f',\n{indent}'.join(
-        repr(c).removeprefix('coordax.') for c in coordinates
-    )
-    return f'coordax.Field.wrap(\n{data_repr},\n{coords_repr},\n)'
+  # TODO(shoyer): restore a custom repr, once it's clear that we handle axis
+  # order consistently with penzai.
+  # def __repr__(self):
+  #   indent = '    '
+  #   data_repr = textwrap.indent(repr(self.data), prefix=indent)
+  #   coordinates = consolidate_coordinates(*self.coords.values())
+  #   coords_repr = indent + f',\n{indent}'.join(
+  #       repr(c).removeprefix('coordax.') for c in coordinates
+  #   )
+  #   return f'coordax.Field.wrap(\n{data_repr},\n{coords_repr},\n)'
 
   # Convenience wrappers: Elementwise infix operators.
   __lt__ = _cmap_with_doc(operator.lt, 'jax.Array.__lt__')

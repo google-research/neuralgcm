@@ -318,13 +318,11 @@ class CoreTest(parameterized.TestCase):
     testing.assert_fields_allclose(actual=actual, desired=expected_result)
 
   def test_field_repr(self):
-    expected = textwrap.dedent("""\
-        coordax.Field.wrap(
-            array([[1, 2, 3],
-                   [4, 5, 6]]),
-            NamedAxis('x', size=2),
-            LabeledAxis('y', ticks=array([7, 8, 9])),
-        )""")
+    expected = (
+        "Field(named_array=<NamedArray int64(| x:2, y:3) "
+        "(wrapping numpy.ndarray)>, coords={'x': NamedAxis(name='x', size=2), "
+        "'y': LabeledAxis(name='y', ticks=np.array([7, 8, 9]))})"
+    )
     actual = coordax.wrap(
         np.array([[1, 2, 3], [4, 5, 6]]),
         'x',
