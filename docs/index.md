@@ -38,5 +38,6 @@ installation.md
 inference_demo.ipynb
 datasets.ipynb
 trained_models.ipynb
+checkpoint_modifications.ipynb
 api.md
 ```
