@@ -15,10 +15,11 @@
 
 This module is intended to be nearly a drop-in replacement for Penzai's
 NamedArray, but with an alternative, simpler implementation. Dimensions are
-specified by a tuple, where each element is either a string or None. None is
+specified by a tuple, where each element is either a string or `None`. `None` is
 used to indicate strictly positional dimensions.
+
+Some code and documentation is adapted from penzai.core.named_axes.
 """
-import collections
 import textwrap
 from typing import Self
 
@@ -165,3 +166,77 @@ class NamedArray:
           f'{result.named_shape} != {named_shape}. {_VALID_PYTREE_OPS}'
       )
     return result
+
+  def tag(self, *dims: str) -> Self:
+    """Attaches dimension names to the positional axes of an array.
+
+    Args:
+      *dims: axis names to assign to each positional axis in the array. Must
+        have exactly the same length as the number of unnamed axes in the array.
+
+    Raises:
+      ValueError: If the wrong number of dimensions are provided.
+
+    Returns:
+      A NamedArray with the given names assigned to the positional axes, and no
+      remaining positional axes.
+    """
+    if len(dims) != len(self.positional_shape):
+      pos_ndim = len(self.positional_shape)
+      raise ValueError(
+          'there must be exactly as many dimensions given to `tag` as there'
+          f' are positional axes in the array, but got {dims} for '
+          f'{pos_ndim} positional {"axis" if pos_ndim == 1 else "axes"}.'
+      )
+
+    if any(not isinstance(name, str) for name in dims):
+      raise TypeError(f'dimension names must be strings: {dims}')
+
+    dim_queue = list(reversed(dims))
+    new_dims = tuple(
+        dim_queue.pop() if dim is None else dim for dim in self.dims
+    )
+    assert not dim_queue
+    return type(self)(self.data, new_dims)
+
+  def untag(self, *dims: str) -> Self:
+    """Removes the requested dimension names.
+
+    `untag` can only be called on a `NamedArray` that does not have any
+    positional axes. It produces a new `NamedArray` where the axes with the
+    requested dimension names are now treated as positional instead.
+
+    Args:
+      *dims: axis names to make positional, in the order they should appear in
+        the positional array.
+
+    Raises:
+      ValueError: if the provided axis ordering is not valid.
+
+    Returns:
+      A named array with the given dimensions converted to positional axes.
+    """
+    if self.positional_shape:
+      raise ValueError(
+          '`untag` cannot be used to introduce positional axes for a NamedArray'
+          ' that already has positional axes. Please assign names to the'
+          ' existing positional axes first using `tag`.'
+      )
+
+    named_shape = self.named_shape
+    if any(dim not in named_shape for dim in dims):
+      raise ValueError(
+          f'cannot untag {dims} because they are not a subset of the current '
+          f'named dimensions {tuple(self.dims)}'
+      )
+
+    ordered = tuple(sorted(dims, key=self.dims.index))
+    if ordered != dims:
+      raise ValueError(
+          f'cannot untag {dims} because they do not appear in the order of '
+          f'the current named dimensions {ordered}'
+      )
+
+    untagged = set(dims)
+    new_dims = tuple(None if dim in untagged else dim for dim in self.dims)
+    return type(self)(self.data, new_dims)

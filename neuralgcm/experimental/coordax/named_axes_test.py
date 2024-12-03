@@ -132,6 +132,99 @@ class NamedAxesTest(absltest.TestCase):
     _, actual = jax.lax.scan(lambda _, x: (None, x), init=None, xs=array)
     assert_named_array_equal(actual, array)
 
+  def test_tag_valid(self):
+    data = np.arange(10).reshape((2, 5))
+
+    array = named_axes.NamedArray(data, (None, 'y'))
+    expected = named_axes.NamedArray(data, ('x', 'y'))
+    actual = array.tag('x')
+    assert_named_array_equal(actual, expected)
+
+    array = named_axes.NamedArray(data, (None, None))
+    expected = named_axes.NamedArray(data, ('x', 'y'))
+    actual = array.tag('x', 'y')
+    assert_named_array_equal(actual, expected)
+
+  def test_tag_errors(self):
+    data = np.arange(10).reshape((2, 5))
+
+    array = named_axes.NamedArray(data, (None, 'y'))
+    with self.assertRaisesRegex(
+        ValueError,
+        re.escape(
+            'there must be exactly as many dimensions given to `tag` as there'
+            ' are positional axes in the array, but got () for '
+            '1 positional axis.'
+        ),
+    ):
+      array.tag()
+
+    array = named_axes.NamedArray(data, (None, None))
+    with self.assertRaisesRegex(
+        ValueError,
+        re.escape(
+            'there must be exactly as many dimensions given to `tag` as there'
+            " are positional axes in the array, but got ('x',) for "
+            '2 positional axes.'
+        ),
+    ):
+      array.tag('x')
+
+    with self.assertRaisesRegex(
+        TypeError,
+        re.escape('dimension names must be strings: (None, None)'),
+    ):
+      array.tag(None, None)
+
+  def test_untag_valid(self):
+    data = np.arange(10).reshape((2, 5))
+    array = named_axes.NamedArray(data, ('x', 'y'))
+
+    expected = named_axes.NamedArray(data, (None, 'y'))
+    actual = array.untag('x')
+    assert_named_array_equal(actual, expected)
+
+    expected = named_axes.NamedArray(data, ('x', None))
+    actual = array.untag('y')
+    assert_named_array_equal(actual, expected)
+
+    expected = named_axes.NamedArray(data, (None, None))
+    actual = array.untag('x', 'y')
+    assert_named_array_equal(actual, expected)
+
+  def test_untag_invalid(self):
+    data = np.arange(10).reshape((2, 5))
+    partially_named_array = named_axes.NamedArray(data, (None, 'y'))
+    fully_named_array = named_axes.NamedArray(data, ('x', 'y'))
+
+    with self.assertRaisesRegex(
+        ValueError,
+        re.escape(
+            '`untag` cannot be used to introduce positional axes for a'
+            ' NamedArray that already has positional axes. Please assign names'
+            ' to the existing positional axes first using `tag`.'
+        ),
+    ):
+      partially_named_array.untag('y')
+
+    with self.assertRaisesRegex(
+        ValueError,
+        re.escape(
+            "cannot untag ('invalid',) because they are not a subset of the"
+            " current named dimensions ('x', 'y')"
+        ),
+    ):
+      fully_named_array.untag('invalid')
+
+    with self.assertRaisesRegex(
+        ValueError,
+        re.escape(
+            "cannot untag ('y', 'x') because they do not appear in the order of"
+            " the current named dimensions ('x', 'y')"
+        ),
+    ):
+      fully_named_array.untag('y', 'x')
+
 
 if __name__ == '__main__':
   absltest.main()
