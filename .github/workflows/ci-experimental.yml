@@ -1,4 +1,4 @@
-name: NeuralGCM tests
+name: Experimental tests
 
 on:
   # Triggers the workflow on push or pull request events but only for the main branch
@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11"]
+        python-version: ["3.11", "3.12"]
     steps:
     - name: Cancel previous
       uses: styfle/cancel-workflow-action@0.7.0
@@ -42,7 +42,7 @@ jobs:
           ${{ runner.os }}-pip-
     - name: Install NeuralGCM
       run: |
-        pip install -e .[tests]
+        pip install -e .[tests,experimental]
     - name: Run unit tests
       run: |
-        pytest -v neuralgcm --ignore=neuralgcm/experimental
+        pytest -v neuralgcm -k experimental
