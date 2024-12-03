@@ -21,6 +21,7 @@ used to indicate strictly positional dimensions.
 Some code and documentation is adapted from penzai.core.named_axes.
 """
 import textwrap
+import types
 from typing import Self
 
 import jax
@@ -240,3 +241,38 @@ class NamedArray:
     untagged = set(dims)
     new_dims = tuple(None if dim in untagged else dim for dim in self.dims)
     return type(self)(self.data, new_dims)
+
+  def order_as(self, *dims: str | types.EllipsisType) -> Self:
+    """Reorder the dimensions of an array.
+
+    All dimensions must be named. Use `tag` first to name any positional axes.
+
+    Args:
+      *dims: dimension names that appear on this array, in the desired order on
+        the result. `...` may be used once, to indicate all other dimensions in
+        order of appearance on this array.
+
+    Returns:
+      Array with transposed data and reordered dimensions, as indicated.
+    """
+    if any(dim is None for dim in self.dims):
+      raise ValueError(
+          'cannot reorder the dimensions of an array with unnamed '
+          f'dimensions: {self.dims}'
+      )
+
+    ellipsis_count = sum(dim is ... for dim in dims)
+    if ellipsis_count > 1:
+      raise ValueError(
+          f'dimension names contain multiple ellipses (...): {dims}'
+      )
+    elif ellipsis_count == 1:
+      explicit_dims = {dim for dim in dims if dim is not ...}
+      implicit_dims = tuple(
+          dim for dim in self.dims if dim not in explicit_dims
+      )
+      i = dims.index(...)
+      dims = dims[:i] + implicit_dims + dims[i + 1 :]
+
+    order = tuple(self.dims.index(dim) for dim in dims)
+    return type(self)(self.data.transpose(order), dims)

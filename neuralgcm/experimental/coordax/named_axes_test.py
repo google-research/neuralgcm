@@ -113,7 +113,12 @@ class NamedAxesTest(absltest.TestCase):
   def test_vmap(self):
     data = np.arange(10).reshape((2, 5))
     array = named_axes.NamedArray(data, (None, 'y'))
-    actual = jax.vmap(lambda x: x)(array)
+
+    def identity_with_checks(x):
+      self.assertEqual(x.dims, ('y',))
+      return x
+
+    actual = jax.vmap(identity_with_checks)(array)
     assert_named_array_equal(actual, array)
 
     array = named_axes.NamedArray(data, ('x', 'y'))
@@ -224,6 +229,65 @@ class NamedAxesTest(absltest.TestCase):
         ),
     ):
       fully_named_array.untag('y', 'x')
+
+  def test_order_as(self):
+    data = np.arange(10).reshape((2, 5))
+    array = named_axes.NamedArray(data, ('x', 'y'))
+
+    actual = array.order_as('x', 'y')
+    assert_named_array_equal(actual, array)
+
+    actual = array.order_as('x', ...)
+    assert_named_array_equal(actual, array)
+
+    actual = array.order_as(..., 'y')
+    assert_named_array_equal(actual, array)
+
+    actual = array.order_as(...)
+    assert_named_array_equal(actual, array)
+
+    expected = named_axes.NamedArray(data.T, ('y', 'x'))
+    actual = array.order_as('y', 'x')
+    assert_named_array_equal(actual, expected)
+
+    expected = named_axes.NamedArray(data.T, ('y', 'x'))
+    actual = array.order_as('y', ...)
+    assert_named_array_equal(actual, expected)
+
+    expected = named_axes.NamedArray(data.T, ('y', 'x'))
+    actual = array.order_as(..., 'x')
+    assert_named_array_equal(actual, expected)
+
+  def test_order_as_unnamed_dims(self):
+    data = np.arange(10).reshape((2, 5))
+    array = named_axes.NamedArray(data, ('x', None))
+    with self.assertRaisesRegex(
+        ValueError,
+        re.escape(
+            'cannot reorder the dimensions of an array with unnamed '
+            "dimensions: ('x', None)"
+        ),
+    ):
+      array.order_as('x', ...)
+
+  def test_order_as_repeated_ellipsis(self):
+    data = np.arange(10).reshape((2, 5))
+    array = named_axes.NamedArray(data, ('x', 'y'))
+    with self.assertRaisesRegex(
+        ValueError,
+        re.escape(
+            "dimension names contain multiple ellipses (...): (Ellipsis, 'x',"
+            ' Ellipsis)'
+        ),
+    ):
+      array.order_as(..., 'x', ...)
+
+  def test_order_as_within_vmap(self):
+    data = np.arange(10).reshape((1, 2, 5))
+    array = named_axes.NamedArray(data, (None, 'x', 'y'))
+    expected = named_axes.NamedArray(data.mT, (None, 'y', 'x'))
+    actual = jax.vmap(lambda x: x.order_as('y', 'x'))(array)
+    assert_named_array_equal(actual, expected)
 
 
 if __name__ == '__main__':
