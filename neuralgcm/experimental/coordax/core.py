@@ -30,7 +30,6 @@ import collections
 import dataclasses
 import functools
 import operator
-import textwrap
 from typing import Any, Callable, Hashable, Mapping, Sequence, TypeAlias, TypeGuard
 
 import jax
@@ -349,6 +348,11 @@ def is_field(value) -> TypeGuard[Field]:
   return isinstance(value, Field)
 
 
+def is_positional_prefix_field(f: Field) -> bool:
+  """Returns True if positional axes of `f` are in prefix order."""
+  return isinstance(f.named_array, named_axes.NamedArray)
+
+
 def cmap(fun: Callable[..., Any]) -> Callable[..., Any]:
   """Vectorizes `fun` over coordinate dimensions of ``Field`` inputs.
 
@@ -656,19 +660,13 @@ class Field(struct.Struct):
     """Returns a field with coords attached to the last positional axes."""
     n_tmp = len(self.positional_shape) - len(_dimension_names(*axis_order))
     tmp_dims = [named_axes.TmpPosAxisMarker() for _ in range(n_tmp)]
-    return (
-        self.tag(*tmp_dims, *axis_order)
-        .untag_prefix(*tmp_dims)
-    )
+    return self.tag(*tmp_dims, *axis_order).untag_prefix(*tmp_dims)
 
   def untag_suffix(self, *axis_order: AxisName | Coordinate) -> Field:
     """Returns a field with requested axes made last positional axes."""
     n_tmp = len(self.positional_shape)
     tmp_dims = [named_axes.TmpPosAxisMarker() for _ in range(n_tmp)]
-    return (
-        self.tag(*tmp_dims)
-        .untag(*tmp_dims, *axis_order)
-    )
+    return self.tag(*tmp_dims).untag(*tmp_dims, *axis_order)
 
   # Note: Can't call this "transpose" like Xarray, to avoid conflicting with the
   # positional only ndarray method.
