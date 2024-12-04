@@ -5,7 +5,7 @@ an attached GPU or TPU. Otherwise, performance will be very slow.
 
 You can install NeuralGCM from source using pip, which should automatically
 install its dependencies, including [JAX](https://github.com/google/jax) and
-[Dinosaur](https://github.com/google-research/dinosaur):
+[Dinosaur](https://github.com/neuralgcm/dinosaur):
 ```
 pip install neuralgcm
 ```

@@ -86,7 +86,7 @@ intersphinx_mapping = {
 html_theme = 'furo'  # https://pradyunsg.me/furo/quickstart/
 # html_logo = "neuralgcm-logo.png"
 html_theme_options = {
-    "source_repository": "https://github.com/google-research/neuralgcm/",
+    "source_repository": "https://github.com/neuralgcm/neuralgcm/",
     "source_branch": "main",
     "source_directory": "docs/",
     "sidebar_hide_name": True,
@@ -136,4 +136,4 @@ def linkcode_resolve(domain, info):
     return None
   filename = os.path.relpath(filename, start=os.path.dirname(neuralgcm.__file__))
   lines = f"#L{linenum}-L{linenum + len(source)}" if linenum else ""
-  return f"https://github.com/google-research/neuralgcm/blob/main/neuralgcm/{filename}{lines}"
+  return f"https://github.com/neuralgcm/neuralgcm/blob/main/neuralgcm/{filename}{lines}"

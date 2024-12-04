@@ -7,11 +7,11 @@ for reproducing and extending results from our paper,
 [Neural General Circulation Models for Weather and Climate](https://arxiv.org/abs/2311.07222):
 
 1. **Dynamics**: The atmospheric dynamical core is distributed in the separate
-   [Dinosaur](https://github.com/google-research/dinosaur) package.
+   [Dinosaur](https://github.com/neuralgcm/dinosaur) package.
 2. **ML modules**: [Haiku](https://github.com/google-deepmind/dm-haiku) modules
    for defining neural network layers.
 3. **ML training**: Pseudo-code for training NeuralGCM models can be found in
-   the [`reference_code` subdirectory](https://github.com/google-research/neuralgcm/tree/main/neuralgcm/reference_code).
+   the [`reference_code` subdirectory](https://github.com/neuralgcm/neuralgcm/tree/main/neuralgcm/reference_code).
 4. **ML inference**: Code for running forecasts with pre-trained models,
    encapsulated in the {py:class}`~neuralgcm.PressureLevelModel` class.
 5. **Evaluation**: Code for evaluating NeuralGCM weather forecasts, along with
