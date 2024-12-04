@@ -112,7 +112,7 @@ autodoc_typehints_description_target = "documented"
 autodoc_typehints_format = "short"
 
 # Customize code links via sphinx.ext.linkcode
-# Borrowed from JAX: https://github.com/google/jax/pull/20961
+# Borrowed from JAX: https://github.com/jax-ml/jax/pull/20961
 
 def linkcode_resolve(domain, info):
   if domain != 'py':
