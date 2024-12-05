@@ -20,7 +20,7 @@ dependencies = [
     "gin-config",
     "jax",
     "jaxlib",
-    "numpy<2",
+    "numpy",
     "optax",
     "pandas",
     "tensorflow_probability",

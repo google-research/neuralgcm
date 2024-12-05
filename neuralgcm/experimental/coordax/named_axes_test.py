@@ -16,6 +16,7 @@ import textwrap
 
 from absl.testing import absltest
 import jax
+import jax.numpy as jnp
 from neuralgcm.experimental.coordax import named_axes
 import numpy as np
 
@@ -289,6 +290,114 @@ class NamedAxesTest(absltest.TestCase):
     actual = jax.vmap(lambda x: x.order_as('y', 'x'))(array)
     assert_named_array_equal(actual, expected)
 
+  def test_nmap_identity(self):
+    data = np.arange(2 * 3 * 4).reshape((2, 3, 4))
+
+    def identity_assert_ndim(ndim):
+      def f(x):
+        self.assertIsInstance(x, jnp.ndarray)
+        self.assertEqual(x.ndim, ndim)
+        return x
+
+      return f
+
+    array = named_axes.NamedArray(data, (None, None, None))
+    actual = named_axes.nmap(identity_assert_ndim(ndim=3))(array)
+    assert_named_array_equal(actual, array)
+
+    array = named_axes.NamedArray(data, ('x', 'y', 'z'))
+    actual = named_axes.nmap(identity_assert_ndim(ndim=0))(array)
+    assert_named_array_equal(actual, array)
+
+    array = named_axes.NamedArray(data, ('x', 'y', None))
+    expected = array.tag('z').order_as('z', ...).untag('z')
+    actual = named_axes.nmap(identity_assert_ndim(ndim=1))(array)
+    assert_named_array_equal(actual, expected)
+
+  def test_nmap_scalar_only(self):
+    expected = named_axes.NamedArray(3, ())
+    actual = named_axes.nmap(jnp.add)(1, 2)
+    assert_named_array_equal(actual, expected)
+
+  def test_nmap_namedarray_and_scalar(self):
+    data = np.arange(2 * 3 * 4).reshape((2, 3, 4))
+    array = named_axes.NamedArray(data, ('x', 'y', 'z'))
+    expected = named_axes.NamedArray(data + 1, ('x', 'y', 'z'))
+
+    actual = named_axes.nmap(jnp.add)(array, 1)
+    assert_named_array_equal(actual, expected)
+
+    actual = named_axes.nmap(jnp.add)(1, array)
+    assert_named_array_equal(actual, expected)
+
+  def test_nmap_two_named_arrays(self):
+    data = np.arange(2 * 3 * 4).reshape((2, 3, 4))
+
+    array = named_axes.NamedArray(data, ('x', 'y', 'z'))
+    expected = named_axes.NamedArray(data * 2, ('x', 'y', 'z'))
+    actual = named_axes.nmap(jnp.add)(array, array)
+    assert_named_array_equal(actual, expected)
+
+    actual = named_axes.nmap(jnp.add)(array, array.order_as('z', 'y', 'x'))
+    assert_named_array_equal(actual, expected)
+
+    array1 = named_axes.NamedArray(data, ('x', 'y', 'z'))
+    array2 = named_axes.NamedArray(100 * data[0, :, 0], ('y',))
+    expected = named_axes.NamedArray(
+        data + 100 * data[:1, :, :1], ('x', 'y', 'z')
+    )
+    actual = named_axes.nmap(jnp.add)(array1, array2)
+    assert_named_array_equal(actual, expected)
+
+    expected = expected.order_as('y', ...).untag('y')
+    actual = named_axes.nmap(jnp.add)(array1.untag('y'), array2.untag('y'))
+    assert_named_array_equal(actual, expected)
+
+    array1 = named_axes.NamedArray(data[:, 0, 0], dims=('x',))
+    array2 = named_axes.NamedArray(100 * data[0, :, 0], dims=('y',))
+    expected = named_axes.NamedArray(
+        data[:, :1, 0] + 100 * data[:1, :, 0], ('x', 'y')
+    )
+    actual = named_axes.nmap(jnp.add)(array1, array2)
+    assert_named_array_equal(actual, expected)
+
+    actual = named_axes.nmap(jnp.add)(array2, array1)
+    assert_named_array_equal(actual, expected.order_as('y', 'x'))
+
+  def test_nmap_inconsistent_named_shape(self):
+
+    def accepts_anything(*args, **kwargs):
+      return 1
+
+    array1 = named_axes.NamedArray(np.zeros((2, 3)), ('x', 'y'))
+    array2 = named_axes.NamedArray(np.zeros((4,)), 'y')
+
+    with self.assertRaisesRegex(
+        ValueError,
+        re.escape(
+            "Inconsistent sizes in a call to nmap(<NAME>) "
+            "for dimensions ['y']:"
+            "\n  args[0].named_shape == {'x': 2, 'y': 3}"
+            "\n  args[1].named_shape == {'y': 4}"
+        ).replace('NAME', '.+'),
+    ):
+      named_axes.nmap(accepts_anything)(array1, array2)
+
+    array1 = named_axes.NamedArray(np.zeros((2, 3)), ('x', 'y'))
+    array2 = named_axes.NamedArray(np.zeros((4, 5)), ('y', 'x'))
+
+    with self.assertRaisesRegex(
+        ValueError,
+        re.escape(
+            "Inconsistent sizes in a call to nmap(<NAME>) "
+            "for dimensions ['x', 'y']:"
+            "\n  kwargs['bar'][0].named_shape == {'y': 4, 'x': 5}"
+            "\n  kwargs['foo'].named_shape == {'x': 2, 'y': 3}"
+        ).replace('NAME', '.+'),
+    ):
+      named_axes.nmap(accepts_anything)(foo=array1, bar=[array2])
+
 
 if __name__ == '__main__':
+  jax.config.update('jax_traceback_filtering', 'off')
   absltest.main()

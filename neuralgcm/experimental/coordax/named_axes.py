@@ -20,9 +20,10 @@ used to indicate strictly positional dimensions.
 
 Some code and documentation is adapted from penzai.core.named_axes.
 """
+import functools
 import textwrap
 import types
-from typing import Self
+from typing import Any, Self
 
 import jax
 import jax.numpy as jnp
@@ -276,3 +277,140 @@ class NamedArray:
 
     order = tuple(self.dims.index(dim) for dim in dims)
     return type(self)(self.data.transpose(order), dims)
+
+
+def _collect_named_shape(
+    leaves_and_paths: list[tuple[jax.tree_util.KeyPath, Any]],
+    source_description: str,
+) -> dict[str, int]:
+  """Collect shared named_shape, or raise an informative error."""
+  known_sizes = {}
+  bad_dims = []
+  for _, leaf in leaves_and_paths:
+    if isinstance(leaf, NamedArray):
+      for name, size in leaf.named_shape.items():
+        if name in known_sizes:
+          if known_sizes[name] != size and name not in bad_dims:
+            bad_dims.append(name)
+        else:
+          known_sizes[name] = size
+
+  if bad_dims:
+    shapes_str = []
+    for keypath, leaf in leaves_and_paths:
+      if isinstance(leaf, NamedArray):
+        if keypath[0] == jax.tree_util.SequenceKey(0):
+          prefix = 'args'
+        else:
+          assert keypath[0] == jax.tree_util.SequenceKey(1)
+          prefix = 'kwargs'
+        path = jax.tree_util.keystr(keypath[1:])
+        shapes_str.append(f'  {prefix}{path}.named_shape == {leaf.named_shape}')
+    shapes_message = '\n'.join(shapes_str)
+
+    raise ValueError(
+        f'Inconsistent sizes in a call to {source_description} for dimensions '
+        f'{bad_dims}:\n{shapes_message}'
+    )
+
+  return known_sizes
+
+
+def nmap(fun):
+  """Automatically vectorizes ``fun`` over named dimensions.
+
+  ``nmap`` is a "named dimension vectorizing map". It wraps an ordinary
+  positional-axis-based function so that it accepts NamedArrays as input and
+  produces NamedArrays as output, and vectorizes over all of named dimensions,
+  calling the original function with positionally-indexed slices corresponding
+  to each argument's `positional_shape`.
+
+  Unlike `jax.vmap`, the axes to vectorize over are inferred
+  automatically from the named dimensions in the NamedArray inputs, rather
+  than being specified as part of the mapping transformation. Specifically, each
+  dimension name that appears in any of the arguments is vectorized over jointly
+  across all arguments that include that dimension, and is then included as a
+  named dimension in the output. To make an axis visible to ``fun``, you can
+  call
+  `untag` on the argument and pass the axis name(s) of interest; ``fun`` will
+  then see those axes as positional axes instead of mapping over them.
+
+  `untag` and ``nmap`` are together the primary ways to apply individual
+  operations to axes of a NamedArray. `tag` can then be used on the result to
+  re-bind names to positional axes.
+
+  Within ``fun``, any mapped-over axes will be accessible using standard JAX
+  collective operations like ``psum``, although doing this is usually
+  unnecessary.
+
+  Args:
+    fun: Function to vectorize by name. This can take arbitrary arguments (even
+      non-JAX-arraylike arguments or "static" axis sizes), but must produce a
+      PyTree of JAX ArrayLike outputs.
+
+  Returns:
+    An automatically-vectorized version of ``fun``, which can optionally be
+    called with NamedArrays instead of ordinary arrays, and which will always
+    return NamedArrays for each of its output leaves. Any argument (or PyTree
+    leaf of an argument) that is a NamedArray will have its named dimensions
+    vectorized over; ``fun`` will then be called with batch tracers
+    corresponding to slices of the input array that are shaped like
+    ``named_array_arg.positional_shape``. Every named dimension that
+    appeared in any input will also appear as the trailing dimensions of every
+    output.
+  """
+
+  @functools.wraps(fun)
+  def wrapped(*args, **kwargs):
+
+    leaves_and_paths, treedef = jax.tree_util.tree_flatten_with_path(
+        (args, kwargs),
+        is_leaf=lambda node: isinstance(node, NamedArray),
+    )
+    leaves = [leaf for _, leaf in leaves_and_paths]
+
+    named_shape = _collect_named_shape(
+        leaves_and_paths, source_description=f'nmap({fun})'
+    )
+    all_dims = tuple(named_shape.keys())
+
+    leaf_dims: list[list[str | None]] = [
+        list(leaf.dims) if isinstance(leaf, NamedArray) else []
+        for leaf in leaves
+    ]
+    all_in_axes = []
+    for vmap_dim in all_dims:
+      in_axes = []
+      for dims in leaf_dims:
+        if vmap_dim in dims:
+          axis = dims.index(vmap_dim)
+          del dims[axis]
+        else:
+          axis = None
+        in_axes.append(axis)
+      all_in_axes.append(in_axes)
+
+    def vectorized_fun(leaf_data):
+      args, kwargs = jax.tree.unflatten(treedef, leaf_data)
+      return fun(*args, **kwargs)
+
+    for out_axis in reversed(range(-len(all_dims), 0)):
+      vectorized_fun = jax.vmap(
+          vectorized_fun,
+          in_axes=(all_in_axes[out_axis],),
+          out_axes=out_axis,
+          axis_name=all_dims[out_axis],
+      )
+
+    leaf_data = [
+        leaf.data if isinstance(leaf, NamedArray) else leaf for leaf in leaves
+    ]
+    result = vectorized_fun(leaf_data)
+
+    def wrap_output(data: jnp.ndarray) -> NamedArray:
+      dims = (None,) * (data.ndim - len(all_dims)) + all_dims
+      return NamedArray(data, dims)
+
+    return jax.tree.map(wrap_output, result)
+
+  return wrapped
