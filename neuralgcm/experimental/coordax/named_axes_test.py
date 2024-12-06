@@ -364,6 +364,15 @@ class NamedAxesTest(absltest.TestCase):
     actual = named_axes.nmap(jnp.add)(array2, array1)
     assert_named_array_equal(actual, expected.order_as('y', 'x'))
 
+  def test_nmap_axis_name(self):
+    data = np.arange(2 * 3).reshape((2, 3))
+    array = named_axes.NamedArray(data, ('x', 'y'))
+    expected = named_axes.NamedArray(
+        data - data.sum(axis=1, keepdims=True), ('x', 'y')
+    )
+    actual = named_axes.nmap(lambda x: x - x.sum(axis='y'))(array)
+    assert_named_array_equal(actual, expected)
+
   def test_nmap_inconsistent_named_shape(self):
 
     def accepts_anything(*args, **kwargs):
@@ -375,7 +384,7 @@ class NamedAxesTest(absltest.TestCase):
     with self.assertRaisesRegex(
         ValueError,
         re.escape(
-            "Inconsistent sizes in a call to nmap(<NAME>) "
+            'Inconsistent sizes in a call to nmap(<NAME>) '
             "for dimensions ['y']:"
             "\n  args[0].named_shape == {'x': 2, 'y': 3}"
             "\n  args[1].named_shape == {'y': 4}"
@@ -389,13 +398,130 @@ class NamedAxesTest(absltest.TestCase):
     with self.assertRaisesRegex(
         ValueError,
         re.escape(
-            "Inconsistent sizes in a call to nmap(<NAME>) "
+            'Inconsistent sizes in a call to nmap(<NAME>) '
             "for dimensions ['x', 'y']:"
             "\n  kwargs['bar'][0].named_shape == {'y': 4, 'x': 5}"
             "\n  kwargs['foo'].named_shape == {'x': 2, 'y': 3}"
         ).replace('NAME', '.+'),
     ):
       named_axes.nmap(accepts_anything)(foo=array1, bar=[array2])
+
+  def test_nmap_out_axes_reorder(self):
+    data = np.arange(2 * 3 * 4).reshape((2, 3, 4))
+    array = named_axes.NamedArray(data, ('x', 'y', 'z'))
+
+    expected = array.order_as('y', 'x', 'z')
+    out_axes = {'y': 0, 'x': 1, 'z': 2}
+    actual = named_axes.nmap(lambda x: x, out_axes=out_axes)(array)
+    assert_named_array_equal(actual, expected)
+
+    expected = array.order_as('y', 'x', 'z')
+    out_axes = {'y': -3, 'x': -2, 'z': -1}
+    actual = named_axes.nmap(lambda x: x, out_axes=out_axes)(array)
+    assert_named_array_equal(actual, expected)
+
+    expected = array.order_as('z', 'x', 'y')
+    out_axes = {'z': 0, 'x': 1, 'y': 2}
+    actual = named_axes.nmap(lambda x: x, out_axes=out_axes)(array)
+    assert_named_array_equal(actual, expected)
+
+  def test_nmap_out_axes_new_dim(self):
+    data = np.arange(2 * 3 * 4).reshape((2, 3, 4))
+    array = named_axes.NamedArray(data, ('x', 'y', 'z'))
+
+    expected = named_axes.NamedArray(
+        data[jnp.newaxis, ...], (None, 'x', 'y', 'z')
+    )
+    out_axes = {'x': 1, 'y': 2, 'z': 3}
+    actual = named_axes.nmap(lambda x: x[jnp.newaxis], out_axes=out_axes)(array)
+    assert_named_array_equal(actual, expected)
+
+    expected = named_axes.NamedArray(
+        data[:, jnp.newaxis, ...], ('x', None, 'y', 'z')
+    )
+    out_axes = {'x': 0, 'y': 2, 'z': 3}
+    actual = named_axes.nmap(lambda x: x[jnp.newaxis], out_axes=out_axes)(array)
+    assert_named_array_equal(actual, expected)
+
+    expected = named_axes.NamedArray(
+        data[..., jnp.newaxis], ('x', 'y', 'z', None)
+    )
+    out_axes = {'x': 0, 'y': 1, 'z': 2}
+    actual = named_axes.nmap(lambda x: x[jnp.newaxis], out_axes=out_axes)(array)
+    assert_named_array_equal(actual, expected)
+
+    expected = named_axes.NamedArray(
+        data[:, jnp.newaxis, ...], ('x', None, 'y', 'z')
+    )
+    out_axes = {'x': -4, 'y': -2, 'z': -1}
+    actual = named_axes.nmap(lambda x: x[jnp.newaxis], out_axes=out_axes)(array)
+    assert_named_array_equal(actual, expected)
+
+    expected = named_axes.NamedArray(
+        data.mT[..., jnp.newaxis], ('x', 'z', 'y', None)
+    )
+    out_axes = {'x': -4, 'z': -3, 'y': -2}
+    actual = named_axes.nmap(lambda x: x[jnp.newaxis], out_axes=out_axes)(array)
+    assert_named_array_equal(actual, expected)
+
+  def test_nmap_out_binary(self):
+    data1 = np.arange(2 * 3).reshape((2, 3))
+    data2 = 10 * np.arange(3 * 2).reshape((3, 2))
+    array1 = named_axes.NamedArray(data1, ('x', 'y'))
+    array2 = named_axes.NamedArray(data2, ('y', 'x'))
+
+    expected1 = array1
+    expected2 = array2.order_as('x', 'y')
+    actual1, actual2 = named_axes.nmap(lambda x, y: (x, y))(array1, array2)
+    assert_named_array_equal(actual1, expected1)
+    assert_named_array_equal(actual2, expected2)
+
+    expected1 = array1
+    expected2 = array2.order_as('x', 'y')
+    actual1, actual2 = named_axes.nmap(
+        lambda x, y: (x, y), out_axes={'x': 0, 'y': 1}
+    )(array1, array2)
+    assert_named_array_equal(actual1, expected1)
+    assert_named_array_equal(actual2, expected2)
+
+    expected1 = array1.order_as('y', 'x')
+    expected2 = array2
+    actual1, actual2 = named_axes.nmap(
+        lambda x, y: (x, y), out_axes={'x': 1, 'y': 0}
+    )(array1, array2)
+    assert_named_array_equal(actual1, expected1)
+    assert_named_array_equal(actual2, expected2)
+
+  def test_nmap_invalid_out_axes(self):
+    data = np.arange(2 * 3).reshape((2, 3))
+    array = named_axes.NamedArray(data, ('x', 'y'))
+
+    with self.assertRaisesRegex(
+        ValueError,
+        re.escape(
+            "out_axes keys ['x'] must must match the named "
+            "dimensions ['x', 'y']"
+        ),
+    ):
+      named_axes.nmap(lambda x: x, out_axes={'x': 0})(array)
+
+    with self.assertRaisesRegex(
+        ValueError,
+        re.escape(
+            'out_axes must be either all positive or all negative, but got '
+            "{'x': 0, 'y': -1}"
+        ),
+    ):
+      named_axes.nmap(lambda x: x, out_axes={'x': 0, 'y': -1})(array)
+
+    with self.assertRaisesRegex(
+        ValueError,
+        re.escape(
+            'out_axes must all have unique values, but got '
+            "{'x': 0, 'y': 0}"
+        ),
+    ):
+      named_axes.nmap(lambda x: x, out_axes={'x': 0, 'y': 0})(array)
 
 
 if __name__ == '__main__':

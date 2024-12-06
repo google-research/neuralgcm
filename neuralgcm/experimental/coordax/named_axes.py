@@ -23,7 +23,7 @@ Some code and documentation is adapted from penzai.core.named_axes.
 import functools
 import textwrap
 import types
-from typing import Any, Self
+from typing import Any, Callable, Self
 
 import jax
 import jax.numpy as jnp
@@ -316,7 +316,53 @@ def _collect_named_shape(
   return known_sizes
 
 
-def nmap(fun):
+def _normalize_out_axes(
+    out_axes: dict[str, int] | None, named_shape: dict[str, int]
+) -> dict[str, int]:
+  """Normalize the out_axes argument to nmap."""
+  if out_axes is None:
+    return {dim: -(i + 1) for i, dim in enumerate(reversed(named_shape.keys()))}
+
+  if out_axes.keys() != named_shape.keys():
+    raise ValueError(
+        f'out_axes keys {list(out_axes)} must must match the named '
+        f'dimensions {list(named_shape)}'
+    )
+  any_negative = any(axis < 0 for axis in out_axes.values())
+  any_non_negative = any(axis >= 0 for axis in out_axes.values())
+  if any_negative and any_non_negative:
+    # TODO(shoyer) consider supporting mixed positive and negative out_axes.
+    # This would require using jax.eval_shape() to determine the
+    # dimensionality of all output arrays.
+    raise ValueError(
+        'out_axes must be either all positive or all negative, but got '
+        f'{out_axes}'
+    )
+  if len(set(out_axes.values())) != len(out_axes):
+    raise ValueError(
+        f'out_axes must all have unique values, but got {out_axes}'
+    )
+  return out_axes
+
+
+def _nest_vmap_axis(inner_axis: int, outer_axis: int) -> int:
+  """Update a vmap in/out axis to account for wrapping in an outer vmap."""
+  if outer_axis >= 0 and inner_axis >= 0:
+    if inner_axis > outer_axis:
+      return inner_axis - 1
+    else:
+      assert inner_axis < outer_axis
+      return inner_axis
+  else:
+    assert outer_axis < 0 and inner_axis < 0
+    if inner_axis > outer_axis:
+      return inner_axis
+    else:
+      assert inner_axis < outer_axis
+      return inner_axis + 1
+
+
+def nmap(fun: Callable, out_axes: dict[str, int] | None = None) -> Callable:  # pylint: disable=g-bare-generic
   """Automatically vectorizes ``fun`` over named dimensions.
 
   ``nmap`` is a "named dimension vectorizing map". It wraps an ordinary
@@ -331,9 +377,8 @@ def nmap(fun):
   dimension name that appears in any of the arguments is vectorized over jointly
   across all arguments that include that dimension, and is then included as a
   named dimension in the output. To make an axis visible to ``fun``, you can
-  call
-  `untag` on the argument and pass the axis name(s) of interest; ``fun`` will
-  then see those axes as positional axes instead of mapping over them.
+  call `untag` on the argument and pass the axis name(s) of interest; ``fun``
+  will then see those axes as positional axes instead of mapping over them.
 
   `untag` and ``nmap`` are together the primary ways to apply individual
   operations to axes of a NamedArray. `tag` can then be used on the result to
@@ -347,6 +392,9 @@ def nmap(fun):
     fun: Function to vectorize by name. This can take arbitrary arguments (even
       non-JAX-arraylike arguments or "static" axis sizes), but must produce a
       PyTree of JAX ArrayLike outputs.
+    out_axes: Optional dictionary from dimension names to axis positions in the
+      output. By default, dimension names appear as the trailing dimensions of
+      every output, in order of their appearance on the inputs.
 
   Returns:
     An automatically-vectorized version of ``fun``, which can optionally be
@@ -355,14 +403,11 @@ def nmap(fun):
     leaf of an argument) that is a NamedArray will have its named dimensions
     vectorized over; ``fun`` will then be called with batch tracers
     corresponding to slices of the input array that are shaped like
-    ``named_array_arg.positional_shape``. Every named dimension that
-    appeared in any input will also appear as the trailing dimensions of every
-    output.
+    ``named_array_arg.positional_shape``.
   """
 
   @functools.wraps(fun)
   def wrapped(*args, **kwargs):
-
     leaves_and_paths, treedef = jax.tree_util.tree_flatten_with_path(
         (args, kwargs),
         is_leaf=lambda node: isinstance(node, NamedArray),
@@ -373,33 +418,50 @@ def nmap(fun):
         leaves_and_paths, source_description=f'nmap({fun})'
     )
     all_dims = tuple(named_shape.keys())
+    out_axes_dict = _normalize_out_axes(out_axes, named_shape)
 
-    leaf_dims: list[list[str | None]] = [
+    nested_in_axes = {}
+    nested_out_axes = {}
+
+    # working_input_dims and working_out_axes will be iteratively updated to
+    # account for nesting in outer vmap calls
+    working_input_dims: list[list[str | None]] = [
         list(leaf.dims) if isinstance(leaf, NamedArray) else []
         for leaf in leaves
     ]
-    all_in_axes = []
+    working_out_axes = out_axes_dict.copy()
+
+    # Calculate in_axes and out_axes for all calls to vmap.
     for vmap_dim in all_dims:
       in_axes = []
-      for dims in leaf_dims:
+      for dims in working_input_dims:
         if vmap_dim in dims:
           axis = dims.index(vmap_dim)
           del dims[axis]
         else:
           axis = None
         in_axes.append(axis)
-      all_in_axes.append(in_axes)
+      nested_in_axes[vmap_dim] = in_axes
+
+      out_axis = working_out_axes.pop(vmap_dim)
+      for dim in working_out_axes:
+        working_out_axes[dim] = _nest_vmap_axis(working_out_axes[dim], out_axis)
+      nested_out_axes[vmap_dim] = out_axis
+
+    assert not working_out_axes  # all dimensions processed
 
     def vectorized_fun(leaf_data):
       args, kwargs = jax.tree.unflatten(treedef, leaf_data)
       return fun(*args, **kwargs)
 
-    for out_axis in reversed(range(-len(all_dims), 0)):
+    # Recursively apply vmap, in the reverse of the order in which we calculated
+    # nested_in_axes and nested_out_axes.
+    for vmap_dim in reversed(all_dims):
       vectorized_fun = jax.vmap(
           vectorized_fun,
-          in_axes=(all_in_axes[out_axis],),
-          out_axes=out_axis,
-          axis_name=all_dims[out_axis],
+          in_axes=(nested_in_axes[vmap_dim],),
+          out_axes=nested_out_axes[vmap_dim],
+          axis_name=vmap_dim,
       )
 
     leaf_data = [
@@ -408,8 +470,10 @@ def nmap(fun):
     result = vectorized_fun(leaf_data)
 
     def wrap_output(data: jnp.ndarray) -> NamedArray:
-      dims = (None,) * (data.ndim - len(all_dims)) + all_dims
-      return NamedArray(data, dims)
+      dims = [None] * data.ndim
+      for dim, axis in out_axes_dict.items():
+        dims[axis] = dim
+      return NamedArray(data, tuple(dims))
 
     return jax.tree.map(wrap_output, result)
 
