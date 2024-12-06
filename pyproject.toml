@@ -34,6 +34,9 @@ tests = [
     "pytest",
 ]
 experimental = [
+    "etils",
+    "fiddle",
     "flax",
+    "orbax",
     "penzai",
 ]
