@@ -39,6 +39,7 @@ def unpack_to_pytree(
 ) -> typing.Pytree:
   """Unpacks an `array` into a pytree with shapes `pytree_of_shapes`."""
   shapes, tree_def = jax.tree.flatten(pytree_of_shapes)
+  shapes = [x.shape for x in shapes]
   splits = np.cumsum(np.array([x[axis] for x in shapes]))[:-1]
   split = jnp.split(array, splits, axis)
   return jax.tree.unflatten(tree_def, split)
@@ -97,7 +98,7 @@ def tree_map_over_nonscalars(
 
 def shape_structure(inputs):
   """Returns `inputs` with leaves replaced by arrays of corresponding shapes."""
-  return jax.tree.map(lambda x: np.asarray(np.shape(x)), inputs)
+  return jax.eval_shape(lambda x: x, inputs)
 
 
 def _normalize_axis(axis: int, ndim: int) -> int:
@@ -363,3 +364,28 @@ def replace_with_matching_or_default(
       raise ValueError(f'Keys {unused_replace_keys} not present in {x.keys()=}')
   flat_result = {k: flat_replace.get(k, default) for k in flat_x.keys()}
   return unflatten_dict(flat_result, empty_keys)
+
+
+def map_over_matching_keys(
+    inputs: dict[str, Any],
+    fn: Callable[[typing.Array], typing.Array],
+    keys_to_map_over: Sequence[str],
+) -> dict[str, Any]:
+  """Applies `fn` to values in `inputs` or sub-dictionaries for matching keys.
+
+  Args:
+    inputs: potentially nested dictionary to map over.
+    fn: function to apply to elements in the `inputs` that have matching keys.
+    keys_to_map_over: keys to which `fn` should be applied to.
+
+  Returns:
+    `inputs` with all elements that have keys matching an entry in
+    `keys_to_map_over` transformed by function `fn`.
+  """
+  outputs = {}
+  for k, v in inputs.items():
+    if not isinstance(v, dict):
+      outputs[k] = fn(v) if k in keys_to_map_over else v
+    else:
+      outputs[k] = map_over_matching_keys(v, fn, keys_to_map_over)
+  return outputs
