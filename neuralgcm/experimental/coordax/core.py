@@ -44,7 +44,12 @@ Pytree: TypeAlias = Any
 
 
 class Coordinate(abc.ABC):
-  """Abstract class for coordinate objects."""
+  """Abstract class for coordinate objects.
+
+  Coordinate subclasses are expected to obey several invariants:
+  1. Dimension names may not be repeated: `len(set(dims)) == len(dims)`
+  2. All dimensions must be named: `len(shape) == len(dims)`
+  """
 
   @property
   @abc.abstractmethod
@@ -62,6 +67,11 @@ class Coordinate(abc.ABC):
   @abc.abstractmethod
   def fields(self) -> dict[AxisName, Field]:
     """A maps from field names to their values."""
+
+  @property
+  def sizes(self) -> dict[AxisName, int]:
+    """Sizes of all dimensions on this coordinate."""
+    return dict(zip(self.dims, self.shape))
 
   @property
   def ndim(self) -> int:

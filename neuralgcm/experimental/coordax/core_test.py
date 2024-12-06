@@ -13,7 +13,6 @@
 # limitations under the License.
 import functools
 import operator
-import textwrap
 from typing import Any, Callable
 
 from absl.testing import absltest
