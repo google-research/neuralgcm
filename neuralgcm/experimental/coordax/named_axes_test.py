@@ -551,6 +551,21 @@ class NamedAxesTest(absltest.TestCase):
     self.assertIsInstance(actual, int)
     self.assertEqual(expected, actual)
 
+  def test_tag_and_untag_function(self):
+    data = np.arange(2 * 3).reshape((2, 3))
+    untagged = named_axes.NamedArray(data, (None, None))
+    tagged = named_axes.NamedArray(data, ('x', 'y'))
+    untagged_tree = {'a': untagged, 'b': untagged}
+    tagged_tree = {'a': tagged, 'b': tagged}
+
+    actual = named_axes.tag(untagged_tree, 'x', 'y')
+    assert_named_array_equal(actual['a'], tagged_tree['a'])
+    assert_named_array_equal(actual['b'], tagged_tree['b'])
+
+    actual = named_axes.untag(tagged_tree, 'x', 'y')
+    assert_named_array_equal(actual['a'], untagged_tree['a'])
+    assert_named_array_equal(actual['b'], untagged_tree['b'])
+
 
 if __name__ == '__main__':
   jax.config.update('jax_traceback_filtering', 'off')
