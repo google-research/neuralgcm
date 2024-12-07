@@ -25,7 +25,7 @@ import tree_math
 
 
 @tree_math.struct
-class TestTreeMathStruct:
+class TreeMathStruct:
   array_attr: typing.Array
   float_attr: float
   dict_attr: dict[str, float]
@@ -340,7 +340,7 @@ class PytreeUtilsTest(parameterized.TestCase):
       ),
       dict(
           testcase_name='tree_math_struct_input',
-          inputs=TestTreeMathStruct(np.ones(10), 1.54, {'a': 0.5, 'b': 0.25}),
+          inputs=TreeMathStruct(np.ones(10), 1.54, {'a': 0.5, 'b': 0.25}),
       ),
   )
   def test_asdict_forward_and_roundtrip(self, inputs):
