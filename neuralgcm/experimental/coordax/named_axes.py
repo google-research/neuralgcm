@@ -619,3 +619,20 @@ class NamedArray:
   real = _wrap_array_method('real')
   round = _wrap_array_method('round')
   view = _wrap_array_method('view')
+
+
+
+def _is_named_array(array: Any) -> bool:
+  return isinstance(array, NamedArray)
+
+PyTree = Any
+
+def tag(tree: PyTree, *dims: str) -> PyTree:
+  """Tag dimensions on all NamedArrays in a PyTree."""
+  tag_arrays = lambda x: x.tag(*dims) if _is_named_array(x) else x
+  return jax.tree.map(tag_arrays, tree, is_leaf=_is_named_array)
+
+def untag(tree: PyTree, *dims: str) -> PyTree:
+  """Untag dimensions from all NamedArrays in a PyTree."""
+  untag_arrays = lambda x: x.untag(*dims) if _is_named_array(x) else x
+  return jax.tree.map(untag_arrays, tree, is_leaf=_is_named_array)
