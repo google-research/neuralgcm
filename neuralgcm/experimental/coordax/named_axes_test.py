@@ -523,6 +523,34 @@ class NamedAxesTest(absltest.TestCase):
     ):
       named_axes.nmap(lambda x: x, out_axes={'x': 0, 'y': 0})(array)
 
+  def test_vectorized_methods(self):
+    data = np.arange(2 * 3 * 4).reshape((2, 3, 4))
+    dims = (None, 'y', 'z')
+    array = named_axes.NamedArray(data, dims)
+
+    expected = named_axes.NamedArray(-data, dims)
+    actual = -array
+    assert_named_array_equal(actual, expected)
+
+    expected = named_axes.NamedArray(data - 1, dims)
+    actual = array - 1
+    assert_named_array_equal(actual, expected)
+
+    expected = named_axes.NamedArray(1 - data, dims)
+    actual = 1 - array
+    assert_named_array_equal(actual, expected)
+
+    expected = named_axes.NamedArray(data + 1j * data, dims)
+    actual = (array - 1j * array).conj()
+    assert_named_array_equal(actual, expected)
+
+  def test_scalar_conversion(self):
+    array = named_axes.NamedArray(1, dims=())
+    expected = 1
+    actual = int(array)
+    self.assertIsInstance(actual, int)
+    self.assertEqual(expected, actual)
+
 
 if __name__ == '__main__':
   jax.config.update('jax_traceback_filtering', 'off')
