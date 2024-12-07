@@ -533,7 +533,7 @@ class PressureLevelModel:
       assert isinstance(times, jax.Array)
       approx_index = jnp.interp(sim_time, times, jnp.arange(times.size))
       index = jnp.round(approx_index).astype(jnp.int32)
-      return jax.tree.map(lambda x: x[index, ...], forcings)
+      return jax.tree_util.tree_map(lambda x: x[index, ...], forcings)
 
     def with_nearest_forcings(func):
       def wrapped(state):
