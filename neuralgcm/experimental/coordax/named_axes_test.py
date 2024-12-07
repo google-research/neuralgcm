@@ -61,6 +61,12 @@ class NamedAxesTest(absltest.TestCase):
     ):
       named_axes.NamedArray(np.zeros((2, 5)), ('x', 'x'))
 
+  def test_constructor_no_dims(self):
+    data = np.arange(10).reshape((2, 5))
+    expected = named_axes.NamedArray(data, (None, None))
+    actual = named_axes.NamedArray(data)
+    assert_named_array_equal(actual, expected)
+
   def test_tree_map_same_dims(self):
     data = np.arange(10).reshape((2, 5))
     array = named_axes.NamedArray(data, ('x', 'y'))

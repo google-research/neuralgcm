@@ -321,20 +321,37 @@ class NamedArray:
 
   Attributes:
     data: the underlying data array.
-    dims: tuple of dimension names or None, with the same length as data.ndim.
-      All dimension names must be unique.
+    dims: tuple of dimension names, with the same length as `data.ndim`. Strings
+      indicate named axes, and may not be repeated. `None` indicates positional
+      axes.
   """
 
   _data: jnp.ndarray
   _dims: tuple[str | None, ...]
 
-  def __init__(self, data: jax.typing.ArrayLike, dims: tuple[str | None, ...]):
+  def __init__(
+      self,
+      data: jax.typing.ArrayLike,
+      dims: tuple[str | None, ...] | None = None,
+  ):
+    """Construct a NamedArray.
+
+    Arguments:
+      data: the underlying data array.
+      dims: optional tuple of dimension names, with the same length as
+        `data.ndim`. Strings indicate named axes, and may not be repeated.
+        `None` indicates positional axes. If `dims` is not provided, all axes
+        are positional.
+    """
     data = jnp.asarray(data)
-    if data.ndim != len(dims):
-      raise ValueError(f'{data.ndim=} != {len(dims)=}')
-    named_dims = [dim for dim in dims if dim is not None]
-    if len(set(named_dims)) < len(named_dims):
-      raise ValueError('dimension names may not be repeated: {dims}')
+    if dims is None:
+      dims = (None,) * data.ndim
+    else:
+      if data.ndim != len(dims):
+        raise ValueError(f'{data.ndim=} != {len(dims)=}')
+      named_dims = [dim for dim in dims if dim is not None]
+      if len(set(named_dims)) < len(named_dims):
+        raise ValueError('dimension names may not be repeated: {dims}')
     self._data = data
     self._dims = dims
 
