@@ -24,7 +24,7 @@ from dinosaur import typing
 import frozendict
 import gin
 import jax
-import jax.core
+import jax.extend as jex
 from jax.interpreters import ad
 from jax.interpreters import batching
 from jax.interpreters import mlir
@@ -299,7 +299,7 @@ def _pmean_all_axes_batch(args, batch_axes):
   return _pmean_all_axes_p.bind(y), batch_axis
 
 
-_pmean_all_axes_p = jax.core.Primitive('pmean_all_axes')
+_pmean_all_axes_p = jex.core.Primitive('pmean_all_axes')
 _pmean_all_axes_p.def_impl(_pmean_all_axes_impl)
 _pmean_all_axes_p.def_abstract_eval(_pmean_all_axes_impl)
 batching.primitive_batchers[_pmean_all_axes_p] = _pmean_all_axes_batch
