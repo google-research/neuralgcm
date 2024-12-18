@@ -42,6 +42,7 @@ inference_demo.ipynb
 checkpoints.md
 datasets.ipynb
 trained_models.ipynb
+neuralgcm_open_datasets.ipynb
 checkpoint_modifications.ipynb
 api.md
 ```
