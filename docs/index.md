@@ -27,8 +27,11 @@ We would love to support training, modifying and fine-tuning NeuralGCM models,
 but with the present codebase based on Haiku and
 [Gin](https://github.com/google/gin-config) this is much trickier than it needs
 to be. We are currently (in May 2024) refactoring the modeling code to improve
-usability. To stay up to date on NeuralGCM, **[subscribe to our mailing list](https://groups.google.com/g/neuralgcm-announce)**.
+usability.
 
+```{tip}
+To stay up to date on NeuralGCM, [subscribe to our mailing list](https://groups.google.com/g/neuralgcm-announce).
+```
 
 ## Contents
 
@@ -36,6 +39,7 @@ usability. To stay up to date on NeuralGCM, **[subscribe to our mailing list](ht
 :maxdepth: 1
 installation.md
 inference_demo.ipynb
+checkpoints.md
 datasets.ipynb
 trained_models.ipynb
 checkpoint_modifications.ipynb
