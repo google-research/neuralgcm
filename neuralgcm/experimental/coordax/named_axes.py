@@ -26,7 +26,7 @@ import functools
 import operator
 import textwrap
 import types
-from typing import Any, Callable, Self
+from typing import Any, Callable, Protocol, Self, TypeVar
 
 import jax
 import jax.numpy as jnp
@@ -259,6 +259,27 @@ def _nmap_with_doc(
   return wrapped_fun
 
 
+def _nmap_unary_op(
+    fun: Callable[..., Any], fun_name: str
+) -> Callable[[NamedArray], NamedArray]:
+  return _nmap_with_doc(fun, fun_name)
+
+
+def _nmap_binary_op(
+    fun: Callable[..., Any], fun_name: str
+) -> Callable[[NamedArray, NamedArray | jax.typing.ArrayLike], NamedArray]:
+  return _nmap_with_doc(fun, fun_name)
+
+
+def _nmap_binary_op_two_outputs(
+    fun: Callable[..., Any], fun_name: str
+) -> Callable[
+    [NamedArray, NamedArray | jax.typing.ArrayLike],
+    tuple[NamedArray, NamedArray],
+]:
+  return _nmap_with_doc(fun, fun_name)
+
+
 def _swapped_binop(binop):
   """Swaps the order of operations for a binary operation."""
 
@@ -268,7 +289,12 @@ def _swapped_binop(binop):
   return swapped
 
 
-def _wrap_scalar_conversion(scalar_conversion):
+T = TypeVar('T')
+
+
+def _wrap_scalar_conversion(
+    scalar_conversion: Callable[..., T],
+) -> Callable[[NamedArray], T]:
   """Wraps a scalar conversion operator on a Field."""
 
   def wrapped_scalar_conversion(self: NamedArray):
@@ -281,11 +307,26 @@ def _wrap_scalar_conversion(scalar_conversion):
   return wrapped_scalar_conversion
 
 
-def _wrap_array_method(name):
+class _NamedArrayMethod(Protocol):
+
+  def __call__(self, /, *args, **kwargs) -> NamedArray:
+    ...
+
+
+def _wrap_array_method(
+    name: str, from_property: bool = False
+) -> _NamedArrayMethod:
   """Wraps an array method on a Field."""
 
-  def func(array, *args, **kwargs):
-    return getattr(array, name)(*args, **kwargs)
+  if from_property:
+
+    def func(array):
+      return getattr(array, name)
+
+  else:
+
+    def func(array, *args, **kwargs):
+      return getattr(array, name)(*args, **kwargs)
 
   array_method = getattr(jax.Array, name)
   wrapped_func = nmap(func)
@@ -572,53 +613,57 @@ class NamedArray:
     return type(self)(self.data.transpose(order), dims)
 
   # Convenience wrappers: Elementwise infix operators.
-  __lt__ = _nmap_with_doc(operator.lt, 'jax.Array.__lt__')
-  __le__ = _nmap_with_doc(operator.le, 'jax.Array.__le__')
-  __eq__ = _nmap_with_doc(operator.eq, 'jax.Array.__eq__')
-  __ne__ = _nmap_with_doc(operator.ne, 'jax.Array.__ne__')
-  __ge__ = _nmap_with_doc(operator.ge, 'jax.Array.__ge__')
-  __gt__ = _nmap_with_doc(operator.gt, 'jax.Array.__gt__')
+  __lt__ = _nmap_binary_op(operator.lt, 'jax.Array.__lt__')
+  __le__ = _nmap_binary_op(operator.le, 'jax.Array.__le__')
+  __eq__ = _nmap_binary_op(operator.eq, 'jax.Array.__eq__')
+  __ne__ = _nmap_binary_op(operator.ne, 'jax.Array.__ne__')
+  __ge__ = _nmap_binary_op(operator.ge, 'jax.Array.__ge__')
+  __gt__ = _nmap_binary_op(operator.gt, 'jax.Array.__gt__')
 
-  __add__ = _nmap_with_doc(operator.add, 'jax.Array.__add__')
-  __sub__ = _nmap_with_doc(operator.sub, 'jax.Array.__sub__')
-  __mul__ = _nmap_with_doc(operator.mul, 'jax.Array.__mul__')
-  __truediv__ = _nmap_with_doc(operator.truediv, 'jax.Array.__truediv__')
-  __floordiv__ = _nmap_with_doc(operator.floordiv, 'jax.Array.__floordiv__')
-  __mod__ = _nmap_with_doc(operator.mod, 'jax.Array.__mod__')
-  __divmod__ = _nmap_with_doc(divmod, 'jax.Array.__divmod__')
-  __pow__ = _nmap_with_doc(operator.pow, 'jax.Array.__pow__')
-  __lshift__ = _nmap_with_doc(operator.lshift, 'jax.Array.__lshift__')
-  __rshift__ = _nmap_with_doc(operator.rshift, 'jax.Array.__rshift__')
-  __and__ = _nmap_with_doc(operator.and_, 'jax.Array.__and__')
-  __or__ = _nmap_with_doc(operator.or_, 'jax.Array.__or__')
-  __xor__ = _nmap_with_doc(operator.xor, 'jax.Array.__xor__')
+  __add__ = _nmap_binary_op(operator.add, 'jax.Array.__add__')
+  __sub__ = _nmap_binary_op(operator.sub, 'jax.Array.__sub__')
+  __mul__ = _nmap_binary_op(operator.mul, 'jax.Array.__mul__')
+  __truediv__ = _nmap_binary_op(operator.truediv, 'jax.Array.__truediv__')
+  __floordiv__ = _nmap_binary_op(operator.floordiv, 'jax.Array.__floordiv__')
+  __mod__ = _nmap_binary_op(operator.mod, 'jax.Array.__mod__')
+  __divmod__ = _nmap_binary_op_two_outputs(divmod, 'jax.Array.__divmod__')
+  __pow__ = _nmap_binary_op(operator.pow, 'jax.Array.__pow__')
+  __lshift__ = _nmap_binary_op(operator.lshift, 'jax.Array.__lshift__')
+  __rshift__ = _nmap_binary_op(operator.rshift, 'jax.Array.__rshift__')
+  __and__ = _nmap_binary_op(operator.and_, 'jax.Array.__and__')
+  __or__ = _nmap_binary_op(operator.or_, 'jax.Array.__or__')
+  __xor__ = _nmap_binary_op(operator.xor, 'jax.Array.__xor__')
 
-  __radd__ = _nmap_with_doc(_swapped_binop(operator.add), 'jax.Array.__radd__')
-  __rsub__ = _nmap_with_doc(_swapped_binop(operator.sub), 'jax.Array.__rsub__')
-  __rmul__ = _nmap_with_doc(_swapped_binop(operator.mul), 'jax.Array.__rmul__')
-  __rtruediv__ = _nmap_with_doc(
+  __radd__ = _nmap_binary_op(_swapped_binop(operator.add), 'jax.Array.__radd__')
+  __rsub__ = _nmap_binary_op(_swapped_binop(operator.sub), 'jax.Array.__rsub__')
+  __rmul__ = _nmap_binary_op(_swapped_binop(operator.mul), 'jax.Array.__rmul__')
+  __rtruediv__ = _nmap_binary_op(
       _swapped_binop(operator.truediv), 'jax.Array.__rtruediv__'
   )
-  __rfloordiv__ = _nmap_with_doc(
+  __rfloordiv__ = _nmap_binary_op(
       _swapped_binop(operator.floordiv), 'jax.Array.__rfloordiv__'
   )
-  __rmod__ = _nmap_with_doc(_swapped_binop(operator.mod), 'jax.Array.__rmod__')
-  __rdivmod__ = _nmap_with_doc(_swapped_binop(divmod), 'jax.Array.__rdivmod__')
-  __rpow__ = _nmap_with_doc(_swapped_binop(operator.pow), 'jax.Array.__rpow__')
-  __rlshift__ = _nmap_with_doc(
+  __rmod__ = _nmap_binary_op(_swapped_binop(operator.mod), 'jax.Array.__rmod__')
+  __rdivmod__ = _nmap_binary_op_two_outputs(
+      _swapped_binop(divmod), 'jax.Array.__rdivmod__'
+  )
+  __rpow__ = _nmap_binary_op(_swapped_binop(operator.pow), 'jax.Array.__rpow__')
+  __rlshift__ = _nmap_binary_op(
       _swapped_binop(operator.lshift), 'jax.Array.__rlshift__'
   )
-  __rrshift__ = _nmap_with_doc(
+  __rrshift__ = _nmap_binary_op(
       _swapped_binop(operator.rshift), 'jax.Array.__rrshift__'
   )
-  __rand__ = _nmap_with_doc(_swapped_binop(operator.and_), 'jax.Array.__rand__')
-  __ror__ = _nmap_with_doc(_swapped_binop(operator.or_), 'jax.Array.__ror__')
-  __rxor__ = _nmap_with_doc(_swapped_binop(operator.xor), 'jax.Array.__rxor__')
+  __rand__ = _nmap_binary_op(
+      _swapped_binop(operator.and_), 'jax.Array.__rand__'
+  )
+  __ror__ = _nmap_binary_op(_swapped_binop(operator.or_), 'jax.Array.__ror__')
+  __rxor__ = _nmap_binary_op(_swapped_binop(operator.xor), 'jax.Array.__rxor__')
 
-  __abs__ = _nmap_with_doc(operator.abs, 'jax.Array.__abs__')
-  __neg__ = _nmap_with_doc(operator.neg, 'jax.Array.__neg__')
-  __pos__ = _nmap_with_doc(operator.pos, 'jax.Array.__pos__')
-  __invert__ = _nmap_with_doc(operator.inv, 'jax.Array.__invert__')
+  __abs__ = _nmap_unary_op(operator.abs, 'jax.Array.__abs__')
+  __neg__ = _nmap_unary_op(operator.neg, 'jax.Array.__neg__')
+  __pos__ = _nmap_unary_op(operator.pos, 'jax.Array.__pos__')
+  __invert__ = _nmap_unary_op(operator.inv, 'jax.Array.__invert__')
 
   # Convenience wrappers: Scalar conversions.
   __bool__ = _wrap_scalar_conversion(bool)
@@ -632,7 +677,7 @@ class NamedArray:
   clip = _wrap_array_method('clip')
   conj = _wrap_array_method('conj')
   conjugate = _wrap_array_method('conjugate')
-  imag = _wrap_array_method('imag')
-  real = _wrap_array_method('real')
+  imag = property(_wrap_array_method('imag', from_property=True))
+  real = property(_wrap_array_method('real', from_property=True))
   round = _wrap_array_method('round')
   view = _wrap_array_method('view')
