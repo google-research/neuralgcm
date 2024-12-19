@@ -32,6 +32,14 @@ usability.
 To stay up to date on NeuralGCM, [subscribe to our mailing list](https://groups.google.com/g/neuralgcm-announce).
 ```
 
+## Questions?
+
+The best place to ask for help using NeuralGCM models or datasets is
+[on GitHub](https://github.com/neuralgcm/neuralgcm/issues).
+
+You can also reach the NeuralGCM team directly at
+[neuralgcm@google.com](mailto:neuralgcm@google.com).
+
 ## Contents
 
 ```{toctree}
