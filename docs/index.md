@@ -14,8 +14,7 @@ for reproducing and extending results from our paper,
    the [`reference_code` subdirectory](https://github.com/neuralgcm/neuralgcm/tree/main/neuralgcm/reference_code).
 4. **ML inference**: Code for running forecasts with pre-trained models,
    encapsulated in the {py:class}`~neuralgcm.PressureLevelModel` class.
-5. **Evaluation**: Code for evaluating NeuralGCM weather forecasts, along with
-   archived re-forecasts for 2020, can be found in the
+5. **Evaluation**: Code for evaluating NeuralGCM weather forecasts can be found in the
    [WeatherBench2](https://github.com/google-research/weatherbench2) project.
 
 The documentation here focuses mostly on our API for *inference* (i.e., running
@@ -40,9 +39,9 @@ To stay up to date on NeuralGCM, [subscribe to our mailing list](https://groups.
 installation.md
 inference_demo.ipynb
 checkpoints.md
-datasets.ipynb
-trained_models.ipynb
-neuralgcm_open_datasets.ipynb
+neuralgcm_datasets.ipynb
+data_preparation.ipynb
+deepdive_into_models.ipynb
 checkpoint_modifications.ipynb
 api.md
 ```
