@@ -546,6 +546,10 @@ class NamedAxesTest(absltest.TestCase):
     actual = 1 - array
     assert_named_array_equal(actual, expected)
 
+    expected = named_axes.NamedArray(data, dims)
+    actual = (array - 1j * array).real
+    assert_named_array_equal(actual, expected)
+
     expected = named_axes.NamedArray(data + 1j * data, dims)
     actual = (array - 1j * array).conj()
     assert_named_array_equal(actual, expected)
